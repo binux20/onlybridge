@@ -113,6 +113,14 @@ export const en: Record<string, string> = {
   'docs.openai_compat.title': '03 / OPENAI COMPATIBLE',
   'docs.openai_compat.body': 'For aider, Continue, Cline, Zed and similar tools: in the tool pick the OpenAI Compatible provider, set baseURL to http://127.0.0.1:7779/v1 and use any apiKey. The proxy uses the model selected in the OnlyBridge dashboard. Note: models may not appear automatically. Add them manually - copy the model id from the dashboard, provider name / display name / API key can be anything, and no custom headers are required.',
 
+  'docs.stream.title': 'STREAMING MODES',
+  'docs.stream.intro': 'OnlyBridge can deliver model output to your tool in two modes. Switch in Settings -> STREAMING MODE; the change is picked up on the next request, no proxy restart needed. Applies to OpenCode and OpenAI Compatible only.',
+  'docs.stream.realtime.title': 'REALTIME (default)',
+  'docs.stream.realtime.body': 'True token-by-token streaming. The proxy opens an SSE connection to OnlySQ and forwards chunks as they arrive — the user sees text appear word by word. Tool fences (```json blocks) are buffered until they close, then emitted as tool_calls. If the upstream stream cuts off mid-JSON, the proxy automatically retries the same request non-stream and recovers the tool from the full reply.',
+  'docs.stream.legacy.title': 'LEGACY',
+  'docs.stream.legacy.body': 'Buffered. The proxy waits for the full reply, slices it into 400-char chunks, and fakes a stream. UX is slower, but for tool calls this is the most stable option.',
+  'docs.stream.claude.note': 'Claude Code is always streamed and is unaffected by this switch. Note: the Claude Code terminal UI buffers the response before showing it, so token-by-token output is not visible there even though the proxy is forwarding chunks live.',
+
   // settings
   'settings.title': 'SETTINGS',
   'settings.lang': 'LANGUAGE',
