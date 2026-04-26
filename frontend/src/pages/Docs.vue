@@ -123,6 +123,23 @@ const cols = [
     <p :style="{ color: 'var(--text)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }">{{ t('docs.openai_compat.body') }}</p>
   </section>
 
+  <div class="mb-6 mt-10">
+    <div class="h2 mb-2">{{ t('docs.stream.title') }}</div>
+    <p :style="{ color: 'var(--text-dim)', maxWidth: '720px', lineHeight: 1.6 }">{{ t('docs.stream.intro') }}</p>
+  </div>
+
+  <section class="card mb-4" :style="{ padding: '20px' }">
+    <div class="label mb-2" :style="{ color: 'var(--accent)' }">{{ t('docs.stream.realtime.title') }}</div>
+    <p :style="{ color: 'var(--text)', lineHeight: 1.6 }">{{ t('docs.stream.realtime.body') }}</p>
+  </section>
+
+  <section class="card mb-4" :style="{ padding: '20px' }">
+    <div class="label mb-2">{{ t('docs.stream.legacy.title') }}</div>
+    <p :style="{ color: 'var(--text)', lineHeight: 1.6 }">{{ t('docs.stream.legacy.body') }}</p>
+  </section>
+
+  <p class="text-[12px] mb-6" :style="{ color: 'var(--text-dim)', lineHeight: 1.5 }">{{ t('docs.stream.claude.note') }}</p>
+
   <p class="mono text-[12px] mt-4" :style="{ color: 'var(--text-dim)', lineHeight: 1.5 }">
     <template v-for="(part, i) in t('docs.disclaimer').split('{link}')" :key="'bot-'+i">
       <span>{{ part }}</span>
