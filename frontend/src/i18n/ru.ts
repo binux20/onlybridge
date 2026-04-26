@@ -128,5 +128,5 @@ export const ru: Record<string, string> = {
   'settings.stream.realtime.desc': 'Настоящий потоковый ответ по словам. Лучший UX. Если JSON тула обрывается — прокси сам ретраит без стрима.',
   'settings.stream.legacy': 'LEGACY',
   'settings.stream.legacy.desc': 'Буферизация: прокси ждёт полный ответ и фейково стримит. UX медленнее, зато самый стабильный для тулов.',
-  'settings.stream.note': 'Действует только для OpenCode и OpenAI Compatible. Claude Code всегда стримит реалтайм.',
+  'settings.stream.note': 'Действует только для OpenCode и OpenAI Compatible. Для Claude Code ответ тоже всегда стримится, но его консольный UI буферизует вывод и показывает его целиком — пословный реалтайм там не видно.',
 }

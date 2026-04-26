@@ -135,5 +135,5 @@ export const en: Record<string, string> = {
   'settings.stream.realtime.desc': 'True token-by-token streaming. Best UX. If a tool JSON gets cut off, the proxy automatically retries non-stream.',
   'settings.stream.legacy': 'LEGACY',
   'settings.stream.legacy.desc': 'Buffered: proxy waits for the full reply, then fakes a stream. Slower UX but the most stable for tools.',
-  'settings.stream.note': 'Applies to OpenCode and OpenAI Compatible only. Claude Code is always realtime.',
+  'settings.stream.note': 'Applies to OpenCode and OpenAI Compatible only. Claude Code is always streamed too, but its terminal UI buffers the response before showing it, so token-by-token output is not visible there.',
 }
