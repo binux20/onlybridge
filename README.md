@@ -1,4 +1,3 @@
-<img width="1632" height="779" alt="Снимок экрана 2026-04-26 150354" src="https://github.com/user-attachments/assets/187e861c-cc91-4283-88bb-411e037e0141" />
 # OnlyBridge
 
 [English](./README.md) | [Русский](./README.ru.md)
@@ -8,6 +7,7 @@ Local dashboard that bridges the free **[OnlySQ](https://my.onlysq.ru)** API int
 OnlySQ ships top-tier models (Claude Opus, Sonnet, Haiku, GPT, Gemini, DeepSeek, Qwen and more) for free, but its native `tool_calling` is broken and most code tools won't work out of the box. OnlyBridge ships three local proxies — one per API dialect — and starts only the one your current tool needs. Each proxy translates between your tool's API format and OnlySQ, injects tool schemas via prompt-engineering and parses fenced ```json blocks back out — so things like file edits, shell commands and parallel tool calls just work.
 
 > This project exists thanks to OnlySQ. The whole goal is to make code tools (Claude Code, OpenCode, aider, Continue, Cline, Kilo Code, Zed and any other OpenAI-compatible client) usable on top of the OnlySQ free tier.
+> <img width="1632" height="779" alt="Снимок экрана 2026-04-26 150354" src="https://github.com/user-attachments/assets/187e861c-cc91-4283-88bb-411e037e0141" />
 
 ## What you get
 
