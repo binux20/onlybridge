@@ -39,6 +39,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "telemetry_opt_in": False,
     "anonymous_id": "",
     "lang": "en",
+    "stream_mode": "realtime",
     "tool_paths": {"claude": "", "opencode": ""},
     "proxy_models": {
         "claude":        {"main": "", "sub": ""},

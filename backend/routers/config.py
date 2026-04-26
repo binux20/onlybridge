@@ -22,6 +22,7 @@ class ConfigPatch(BaseModel):
     vision_model: str | None = None
     telemetry_opt_in: bool | None = None
     lang: str | None = None
+    stream_mode: str | None = None
     tool_paths: dict[str, str] | None = None
     proxy_models: dict[str, dict[str, str | None]] | None = None
 

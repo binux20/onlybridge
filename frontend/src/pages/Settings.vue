@@ -6,6 +6,7 @@ import { t, locale, setLocale, type Locale } from '../i18n'
 const cfg = ref<AppConfig | null>(null)
 const claudePath = ref('')
 const opencodePath = ref('')
+const streamMode = ref<'realtime' | 'legacy'>('realtime')
 const saving = ref(false)
 const err = ref('')
 const saved = ref(false)
@@ -16,7 +17,13 @@ async function load() {
     cfg.value = c
     claudePath.value = c.tool_paths?.claude || ''
     opencodePath.value = c.tool_paths?.opencode || ''
+    streamMode.value = c.stream_mode === 'legacy' ? 'legacy' : 'realtime'
   } catch (e: any) { err.value = String(e) }
+}
+
+async function setStreamMode(m: 'realtime' | 'legacy') {
+  streamMode.value = m
+  try { await api.patchConfig({ stream_mode: m } as any) } catch (e: any) { err.value = String(e) }
 }
 
 async function savePaths() {
@@ -68,6 +75,18 @@ onMounted(load)
       <button class="btn btn-primary" :disabled="saving" @click="savePaths">{{ saving ? '...' : t('settings.paths.save') }}</button>
       <span v-if="saved" class="mono text-[12px]" :style="{ color: 'var(--accent)' }">OK</span>
     </div>
+  </section>
+
+  <section class="card mb-6">
+    <div class="label mb-4">{{ t('settings.stream.title') }}</div>
+    <div class="flex gap-2 mb-3">
+      <button class="btn" :class="streamMode === 'realtime' ? 'btn-primary' : 'btn-ghost'" @click="setStreamMode('realtime')">{{ t('settings.stream.realtime') }}</button>
+      <button class="btn" :class="streamMode === 'legacy' ? 'btn-primary' : 'btn-ghost'" @click="setStreamMode('legacy')">{{ t('settings.stream.legacy') }}</button>
+    </div>
+    <p class="text-[12px] mb-2" :style="{ color: 'var(--text-dim)' }">
+      {{ streamMode === 'realtime' ? t('settings.stream.realtime.desc') : t('settings.stream.legacy.desc') }}
+    </p>
+    <p class="text-[11px]" :style="{ color: 'var(--text-dim)' }">{{ t('settings.stream.note') }}</p>
   </section>
 
   <section class="card mb-6">

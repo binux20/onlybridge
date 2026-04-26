@@ -55,6 +55,15 @@ def _read_onlysq_key() -> str:
         return ""
 
 
+def _read_stream_mode() -> str:
+    try:
+        with open(_BRIDGE_CONFIG_PATH, "r", encoding="utf-8") as f:
+            v = (json.load(f).get("stream_mode") or "realtime").strip().lower()
+            return v if v in ("realtime", "legacy") else "realtime"
+    except (OSError, json.JSONDecodeError):
+        return "realtime"
+
+
 def _write_onlysq_key(key: str) -> None:
     try:
         data = {}
@@ -754,12 +763,11 @@ async def stream_sse(
 # ─────────────────────────────────────────────
 # SSE СТРИМИНГ для OpenAI /v1/chat/completions
 # ─────────────────────────────────────────────
-async def stream_sse_openai(
+async def stream_sse_openai_legacy(
     resp: aiohttp.ClientResponse,
     model: str,
 ) -> AsyncGenerator[str, None]:
-    """Читает JSON от OnlySQ (stream=False), парсит тулы,
-    отдаёт клиенту в OpenAI SSE формате."""
+    """Legacy: читает полный JSON от OnlySQ (stream=False), отдаёт чанками по 400."""
     chat_id = f"chatcmpl-{uuid.uuid4().hex[:16]}"
     created = int(time.time())
 
@@ -808,6 +816,119 @@ async def stream_sse_openai(
                    "model": model, "choices": [{"index": 0, "delta": {"tool_calls": tool_calls}, "finish_reason": "tool_calls"}]})
 
     yield "data: [DONE]\n\n"
+
+
+async def stream_sse_openai_realtime(
+    resp: aiohttp.ClientResponse,
+    model: str,
+    onlysq_body: dict,
+    is_sub: bool,
+) -> AsyncGenerator[str, None]:
+    chat_id = f"chatcmpl-{uuid.uuid4().hex[:16]}"
+    created = int(time.time())
+
+    def sse(data: dict) -> str:
+        return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+    yield sse({"id": chat_id, "object": "chat.completion.chunk", "created": created,
+               "model": model, "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}]})
+
+    full_text = ""
+    pending_buf = ""
+    tool_started = False
+
+    try:
+        async for raw in resp.content:
+            line = raw.decode("utf-8", errors="ignore").strip()
+            if not line.startswith("data: ") or line == "data: [DONE]":
+                continue
+            try:
+                chunk = json.loads(line[6:])
+                delta = chunk["choices"][0].get("delta", {})
+                piece = delta.get("content") or ""
+                if not piece:
+                    continue
+                full_text += piece
+                if tool_started:
+                    pending_buf += piece
+                    continue
+                pending_buf += piece
+                m = _TOOL_FENCE_START.search(pending_buf)
+                if m:
+                    tool_started = True
+                    safe_text = pending_buf[:m.start()].rstrip()
+                    if safe_text:
+                        yield sse({"id": chat_id, "object": "chat.completion.chunk", "created": created,
+                                   "model": model, "choices": [{"index": 0, "delta": {"content": safe_text}, "finish_reason": None}]})
+                    pending_buf = ""
+                else:
+                    if len(pending_buf) > 10:
+                        safe_text = pending_buf[:-10]
+                        pending_buf = pending_buf[-10:]
+                        yield sse({"id": chat_id, "object": "chat.completion.chunk", "created": created,
+                                   "model": model, "choices": [{"index": 0, "delta": {"content": safe_text}, "finish_reason": None}]})
+            except Exception:
+                pass
+    except asyncio.CancelledError:
+        pass
+    except Exception as e:
+        log.debug(f"[STREAM_OAI_RT] обрыв: {e}")
+
+    tools, text_before = extract_tools(full_text)
+
+    if tool_started and not tools:
+        log.warning(f"[STREAM_OAI_RT] JSON тула обрезан ({len(full_text)} симв), retry non-stream...")
+        retry_body = dict(onlysq_body)
+        retry_body["stream"] = False
+        retry_resp, _ = await call_onlysq(retry_body, is_sub)
+        if retry_resp is not None:
+            try:
+                data = await retry_resp.json()
+                full_text = data["choices"][0]["message"].get("content", "")
+                tools, text_before = extract_tools(full_text)
+                log.info(f"[STREAM_OAI_RT] retry успешен, тулов: {len(tools)}")
+            except Exception as e:
+                log.error(f"[STREAM_OAI_RT] retry ошибка: {e}")
+            finally:
+                retry_resp.release()
+
+    if not tools:
+        if pending_buf:
+            yield sse({"id": chat_id, "object": "chat.completion.chunk", "created": created,
+                       "model": model, "choices": [{"index": 0, "delta": {"content": pending_buf}, "finish_reason": None}]})
+        yield sse({"id": chat_id, "object": "chat.completion.chunk", "created": created,
+                   "model": model, "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]})
+    else:
+        if text_before:
+            yield sse({"id": chat_id, "object": "chat.completion.chunk", "created": created,
+                       "model": model, "choices": [{"index": 0, "delta": {"content": text_before}, "finish_reason": None}]})
+        tool_calls = [{
+            "index":    idx,
+            "id":       f"call_{uuid.uuid4().hex[:8]}",
+            "type":     "function",
+            "function": {
+                "name":      t["name"],
+                "arguments": json.dumps(t["input"], ensure_ascii=False),
+            },
+        } for idx, t in enumerate(tools)]
+        yield sse({"id": chat_id, "object": "chat.completion.chunk", "created": created,
+                   "model": model, "choices": [{"index": 0, "delta": {"tool_calls": tool_calls}, "finish_reason": "tool_calls"}]})
+
+    yield "data: [DONE]\n\n"
+
+
+async def stream_sse_openai(
+    resp: aiohttp.ClientResponse,
+    model: str,
+    onlysq_body: dict,
+    is_sub: bool,
+) -> AsyncGenerator[str, None]:
+    if _read_stream_mode() == "legacy":
+        async for c in stream_sse_openai_legacy(resp, model):
+            yield c
+    else:
+        async for c in stream_sse_openai_realtime(resp, model, onlysq_body, is_sub):
+            yield c
 
 
 # ─────────────────────────────────────────────
@@ -997,7 +1118,9 @@ async def openai_chat_completions(request: Request):
     log.info(f"\n[OPENAI] model={model} | agent={label} | stream={is_stream} | tools={len(anthropic_tools)}")
 
     onlysq_body = build_onlysq_body(anthropic_body, model)
-    log.info(f"[ONLYSQ] messages: {len(onlysq_body['messages'])}")
+    if is_stream and _read_stream_mode() == "realtime":
+        onlysq_body["stream"] = True
+    log.info(f"[ONLYSQ] messages: {len(onlysq_body['messages'])} | stream_to_onlysq={onlysq_body.get('stream')}")
 
     prompt_tok = tokens_from_messages(onlysq_body.get("messages"))
     started = time.time()
@@ -1012,7 +1135,7 @@ async def openai_chat_completions(request: Request):
         captured: list[str] = []
         async def gen():
             try:
-                async for chunk in stream_sse_openai(resp, model):
+                async for chunk in stream_sse_openai(resp, model, onlysq_body, is_sub):
                     captured.append(chunk)
                     yield chunk
             except asyncio.CancelledError:

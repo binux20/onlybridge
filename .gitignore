@@ -23,6 +23,9 @@ data/aider_settings_backups/*
 # Per-proxy local config that the proxies write next to themselves
 backend/proxies/proxy_config.json
 
+# Local proxy backups
+backend/proxies/_backups/
+
 # Test/scratch files
 test_*.py
 

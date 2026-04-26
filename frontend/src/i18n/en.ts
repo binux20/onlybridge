@@ -129,4 +129,11 @@ export const en: Record<string, string> = {
   'support.title': 'BUGS / IDEAS',
   'support.body': 'Found a bug or have an idea? Ping me on Telegram:',
   'support.handle': '@notgay8',
+
+  'settings.stream.title': 'STREAMING MODE',
+  'settings.stream.realtime': 'REALTIME',
+  'settings.stream.realtime.desc': 'True token-by-token streaming. Best UX. If a tool JSON gets cut off, the proxy automatically retries non-stream.',
+  'settings.stream.legacy': 'LEGACY',
+  'settings.stream.legacy.desc': 'Buffered: proxy waits for the full reply, then fakes a stream. Slower UX but the most stable for tools.',
+  'settings.stream.note': 'Applies to OpenCode and OpenAI Compatible only. Claude Code is always realtime.',
 }

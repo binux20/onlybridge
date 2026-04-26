@@ -122,4 +122,11 @@ export const ru: Record<string, string> = {
   'support.title': 'БАГИ / ИДЕИ',
   'support.body': 'Нашли баг или есть идея? Пишите в Telegram:',
   'support.handle': '@notgay8',
+
+  'settings.stream.title': 'РЕЖИМ СТРИМИНГА',
+  'settings.stream.realtime': 'РЕАЛТАЙМ',
+  'settings.stream.realtime.desc': 'Настоящий потоковый ответ по словам. Лучший UX. Если JSON тула обрывается — прокси сам ретраит без стрима.',
+  'settings.stream.legacy': 'LEGACY',
+  'settings.stream.legacy.desc': 'Буферизация: прокси ждёт полный ответ и фейково стримит. UX медленнее, зато самый стабильный для тулов.',
+  'settings.stream.note': 'Действует только для OpenCode и OpenAI Compatible. Claude Code всегда стримит реалтайм.',
 }
