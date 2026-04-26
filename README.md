@@ -76,6 +76,14 @@ start.bat       one-click launcher (Windows)
 start.sh        one-click launcher (macOS/Linux)
 ```
 
+## Recent updates
+
+- Switchable Realtime / Legacy streaming for the OpenCode and OpenAI-compatible proxies (Settings → STREAMING MODE).
+- Per-proxy main / sub model overrides — each proxy can run a different model than the global default.
+- `start.bat` falls back to `python` if the `py` launcher is not in PATH.
+- Stats note linking to `my.onlysq.ru/usage` for exact usage; tiktoken is used locally for an approximate count.
+- Telegram contact for bugs / ideas added to Docs and Settings.
+
 ## Bugs / ideas
 
 Telegram: [@notgay8](https://t.me/notgay8)
