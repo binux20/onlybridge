@@ -1,0 +1,260 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root,
+html[data-theme='dark'] {
+  --bg: #000000;
+  --bg-elev-1: #0a0a0a;
+  --bg-elev-2: #111111;
+  --bg-hover: #1a1410;
+  --border: #1f1f1f;
+  --border-soft: #141414;
+  --grid: rgba(255, 255, 255, 0.025);
+  --text: #f2f2f2;
+  --text-dim: #8a8a8a;
+  --text-muted: #555555;
+  --accent: #ff7a1a;
+  --accent-hi: #ff9447;
+  --accent-bg: rgba(255, 122, 26, 0.15);
+  --accent-soft: rgba(255, 122, 26, 0.08);
+  --success: #2ea043;
+  --danger: #e5484d;
+  --warn: #e5a23b;
+}
+
+html[data-theme='light'] {
+  --bg: #ffffff;
+  --bg-elev-1: #fafafa;
+  --bg-elev-2: #f2f2f2;
+  --bg-hover: #f4ece6;
+  --border: #e5e5e5;
+  --border-soft: #ececec;
+  --grid: rgba(0, 0, 0, 0.04);
+  --text: #111111;
+  --text-dim: #4a4a4a;
+  --text-muted: #8a8a8a;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  position: relative;
+  z-index: 0;
+}
+
+#app::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: linear-gradient(to right, var(--grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+.label {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.h-display {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  font-size: 48px;
+  line-height: 1;
+}
+
+.h1 {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.h2 {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+
+.hl {
+  background: var(--accent);
+  color: #0a0a0a;
+  padding: 0.05em 0.2em;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 2px;
+  border: 1px solid transparent;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out, border-color 120ms ease-out;
+  user-select: none;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #0a0a0a;
+  border-color: var(--accent);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hi);
+  border-color: var(--accent-hi);
+}
+.btn-outline {
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.btn-outline:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: #2a2a2a;
+}
+
+.input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+}
+.input::placeholder {
+  color: var(--text-muted);
+}
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.card {
+  background: var(--bg-elev-1);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 24px;
+}
+.card.is-running {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  background: transparent;
+}
+.badge-running {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.badge-external {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+.badge-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.tab {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  padding: 18px 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 120ms ease-out, border-color 120ms ease-out;
+}
+.tab:hover {
+  color: var(--text);
+}
+.tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 24px 0;
+}
+
+.tier-table thead th {
+  background: var(--bg-elev-2);
+}
+.tier-table tbody tr:nth-child(odd) td {
+  background: var(--bg-elev-2);
+}
+.tier-table tbody tr:nth-child(even) td {
+  background: var(--bg-elev-1);
+}
+.tier-table th,
+.tier-table td {
+  border: 1px solid var(--border);
+}

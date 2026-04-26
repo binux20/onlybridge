@@ -1,0 +1,35 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+node_modules/
+.DS_Store
+*.log
+
+# Local-only data
+data/onlybridge.db
+data/onlybridge.db-wal
+data/onlybridge.db-shm
+data/config.json
+data/claude_settings_backups/*
+!data/claude_settings_backups/.gitkeep
+data/opencode_settings_backups/*
+!data/opencode_settings_backups/.gitkeep
+data/continue_settings_backups/*
+!data/continue_settings_backups/.gitkeep
+data/aider_settings_backups/*
+!data/aider_settings_backups/.gitkeep
+
+# Per-proxy local config that the proxies write next to themselves
+backend/proxies/proxy_config.json
+
+# Test/scratch files
+test_*.py
+
+# Private notes / docs (kept local)
+CLAUDE.md
+docs/
+memory/
+
+# Local Claude Code harness settings
+.claude/
