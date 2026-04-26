@@ -49,10 +49,10 @@ start.bat
 ```
 git clone https://github.com/binux20/onlybridge
 cd onlybridge
-pip install -r requirements.txt
-(cd frontend && npm install && npm run build)
 bash start.sh
 ```
+
+`start.sh` сам находит `python3`/`python`, ставит `requirements.txt` если надо, собирает фронтенд при первом запуске (если установлен `npm`) и открывает панель.
 
 Дальше открываете <http://localhost:8800>, вставляете ключ OnlySQ в **Setup**, выбираете инструмент, жмёте **Setup & Start**.
 

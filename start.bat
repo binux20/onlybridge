@@ -37,8 +37,29 @@ if "%NEEDS_INSTALL%"=="1" (
 )
 
 if not exist "frontend\dist\index.html" (
-  echo [OnlyBridge] frontend\dist not found - the dashboard UI will not load.
-  echo Run "cd frontend ^&^& npm install ^&^& npm run build" once, or pull a release that ships dist/.
+  where npm >nul 2>&1
+  if errorlevel 1 (
+    echo [OnlyBridge] frontend\dist not found and npm is not in PATH - the dashboard UI will not load.
+    echo Install Node.js from https://nodejs.org/ then re-run, or run "cd frontend ^&^& npm install ^&^& npm run build" manually.
+  ) else (
+    echo [OnlyBridge] Building frontend (first run, may take ~30s)...
+    pushd frontend
+    call npm install --silent
+    if errorlevel 1 (
+      echo [OnlyBridge] npm install failed. See messages above.
+      popd
+      pause
+      exit /b 1
+    )
+    call npm run build
+    if errorlevel 1 (
+      echo [OnlyBridge] npm run build failed. See messages above.
+      popd
+      pause
+      exit /b 1
+    )
+    popd
+  )
 )
 
 start "" http://localhost:8800
