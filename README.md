@@ -1,3 +1,4 @@
+<img width="1632" height="779" alt="Снимок экрана 2026-04-26 150354" src="https://github.com/user-attachments/assets/187e861c-cc91-4283-88bb-411e037e0141" />
 # OnlyBridge
 
 [English](./README.md) | [Русский](./README.ru.md)
