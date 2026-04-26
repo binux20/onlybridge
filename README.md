@@ -23,6 +23,16 @@ A single dashboard on `http://localhost:8800` lets you:
 - click **Setup & Start** — the dashboard writes the right config into `~/.claude/settings.json` / `opencode.json` / etc., backs the previous file up, and starts the proxy
 - watch live logs (SSE), request stats and a 14-day timeseries chart
 - toggle EN/RU and dark/light
+- pick streaming mode (Realtime / Legacy) — see below
+
+## Streaming modes
+
+The OpenCode and OpenAI-compatible proxies have a switchable streaming mode in **Settings → STREAMING MODE**. The change is picked up on the next request, no restart needed.
+
+- **Realtime** (default) — true token-by-token streaming. The proxy opens an SSE stream to OnlySQ and forwards chunks as they arrive. JSON tool fences (```json) are buffered until they close, then emitted as `tool_calls`. If the upstream stream cuts off mid-JSON, the proxy automatically retries the same request non-stream and recovers the tool call.
+- **Legacy** — buffered: the proxy waits for the full reply, then fakes a stream in 400-char chunks. UX is slower but it is the most stable for tools.
+
+Claude Code is always streamed and is unaffected by this switch. Note: the Claude Code terminal UI buffers the stream before showing it, so token-by-token output is not visible there even though the proxy is forwarding chunks live.
 
 ## Quick start (Windows)
 
