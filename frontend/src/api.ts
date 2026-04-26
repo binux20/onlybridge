@@ -18,6 +18,7 @@ export interface AppConfig {
   telemetry_opt_in: boolean
   anonymous_id?: string
   lang?: string
+  stream_mode?: 'realtime' | 'legacy'
   tool_paths?: { claude?: string; opencode?: string }
 }
 
