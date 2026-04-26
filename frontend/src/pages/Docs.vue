@@ -141,7 +141,7 @@ const cols = [
   <p class="text-[12px] mb-6" :style="{ color: 'var(--text-dim)', lineHeight: 1.5 }">{{ t('docs.stream.claude.note') }}</p>
 
   <p class="mono text-[12px] mt-4" :style="{ color: 'var(--text-dim)', lineHeight: 1.5 }">
-    <template v-for="(part, i) in t('docs.disclaimer').split('{link}')" :key="'bot-'+i">
+    <template v-for="(part, i) in t('docs.disclaimer.bottom').split('{link}')" :key="'bot-'+i">
       <span>{{ part }}</span>
       <a v-if="i === 0" :href="DOCS" target="_blank" rel="noopener"
          :style="{ color: 'var(--accent)', textDecoration: 'underline' }">{{ t('docs.disclaimer.link') }}</a>

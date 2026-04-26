@@ -79,6 +79,7 @@ export const en: Record<string, string> = {
   'docs.intro': 'Three proxies expose OnlySQ to your code tools. Pick the section that matches your tool.',
 
   'docs.disclaimer': 'The instructions below for getting an API key, verification and per-account RPM may be out of date — always cross-check the {link}.',
+  'docs.disclaimer.bottom': 'The instructions above for getting an API key, verification and per-account RPM may be out of date — always cross-check the {link}.',
   'docs.disclaimer.link': 'official site',
 
   'docs.key.title': '01 / GETTING ONLYSQ API KEY',
