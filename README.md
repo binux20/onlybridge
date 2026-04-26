@@ -4,7 +4,7 @@
 
 Local dashboard that bridges the free **[OnlySQ](https://my.onlysq.ru)** API into your favourite code tools.
 
-OnlySQ ships top-tier models (Claude Opus, Sonnet, Haiku, GPT, Gemini, DeepSeek, Qwen and more) for free, but its native `tool_calling` is broken and most code tools won't work out of the box. OnlyBridge runs three local proxies that translate between your tool's API format and OnlySQ, inject tool schemas via prompt-engineering and parse fenced ```json blocks back out — so things like file edits, shell commands and parallel tool calls just work.
+OnlySQ ships top-tier models (Claude Opus, Sonnet, Haiku, GPT, Gemini, DeepSeek, Qwen and more) for free, but its native `tool_calling` is broken and most code tools won't work out of the box. OnlyBridge ships three local proxies — one per API dialect — and starts only the one your current tool needs. Each proxy translates between your tool's API format and OnlySQ, injects tool schemas via prompt-engineering and parses fenced ```json blocks back out — so things like file edits, shell commands and parallel tool calls just work.
 
 > This project exists thanks to OnlySQ. The whole goal is to make code tools (Claude Code, OpenCode, aider, Continue, Cline, Kilo Code, Zed and any other OpenAI-compatible client) usable on top of the OnlySQ free tier.
 
