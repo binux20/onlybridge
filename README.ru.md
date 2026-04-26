@@ -1,0 +1,86 @@
+# OnlyBridge
+
+[English](./README.md) | [Русский](./README.ru.md)
+
+Локальная панель, которая подключает бесплатный API **[OnlySQ](https://my.onlysq.ru)** к вашим любимым код-инструментам.
+
+OnlySQ раздаёт топовые модели (Claude Opus, Sonnet, Haiku, GPT, Gemini, DeepSeek, Qwen и другие) бесплатно, но их нативный `tool_calling` сломан, и большинство код-инструментов не работает из коробки. OnlyBridge поднимает три локальных прокси, которые транслируют между форматом вашего инструмента и OnlySQ, инжектят схемы тулов через промпт-инжиниринг и парсят обратно ```json блоки — благодаря этому правка файлов, shell-команды и параллельные tool calls работают как надо.
+
+> Этот проект существует благодаря OnlySQ. Главная цель — заставить код-инструменты (Claude Code, OpenCode, aider, Continue, Cline, Kilo Code, Zed и любой другой OpenAI-совместимый клиент) работать поверх бесплатного тарифа OnlySQ.
+
+## Что внутри
+
+| Инструмент | Порт | Формат |
+|---|---|---|
+| Claude Code | `7777` | Anthropic `/v1/messages` |
+| OpenCode | `7778` | OpenAI `/v1/chat/completions` |
+| OpenAI-совместимые (aider, Continue, Cline, Kilo Code, Zed, ...) | `7779` | OpenAI `/v1/chat/completions` |
+
+Одна панель на `http://localhost:8800` позволяет:
+
+- вставить ключ OnlySQ один раз (общий для всех прокси)
+- выбрать main / sub модель для каждого прокси (живой список моделей с OnlySQ, vision и embed модели отфильтрованы)
+- нажать **Setup & Start** — панель сама пропишет нужный конфиг в `~/.claude/settings.json` / `opencode.json` / и т.д., сделает бэкап старого файла и запустит прокси
+- смотреть live-логи (SSE), статистику запросов и график за 14 дней
+- переключать EN/RU и тёмную/светлую тему
+
+## Быстрый старт (Windows)
+
+```
+git clone https://github.com/binux20/onlybridge
+cd onlybridge
+start.bat
+```
+
+`start.bat` сам проверяет Python, ставит `requirements.txt` если надо, собирает фронтенд при первом запуске и открывает панель. Никаких ручных venv, никаких ручных `pip install`.
+
+## Быстрый старт (macOS / Linux)
+
+```
+git clone https://github.com/binux20/onlybridge
+cd onlybridge
+pip install -r requirements.txt
+(cd frontend && npm install && npm run build)
+bash start.sh
+```
+
+Дальше открываете <http://localhost:8800>, вставляете ключ OnlySQ в **Setup**, выбираете инструмент, жмёте **Setup & Start**.
+
+## Получение ключа OnlySQ
+
+1. Регистрируетесь на <https://my.onlysq.ru>
+2. Верифицируетесь через Telegram-бота [@OnlySqVerificarion_bot](https://t.me/OnlySqVerificarion_bot) — рекомендуется Telegram + номер телефона (только Telegram-верификация не открывает Premium-тир бесплатных моделей вроде Opus 4.5)
+3. Генерируете API-ключ на <https://my.onlysq.ru>
+4. Вставляете в панель
+
+Полный гайд, лимиты по тирам и ручная настройка каждого инструмента — внутри вкладки **Docs** в самой панели.
+
+## Почему три прокси, а не один
+
+Каждый клиент говорит на своём диалекте:
+
+- Claude Code ждёт стриминговый SSE Anthropic с событиями `content_block_delta` и tool use блоками
+- OpenCode ждёт OpenAI-стриминг со своими title-generation и sub-agent причудами
+- aider / Continue / Cline / Kilo Code / Zed ждут чистый OpenAI-стриминг
+
+Держать их в отдельных процессах удобно ещё и потому, что баг в одном прокси не уронит остальные, а определение портов через `psutil` показывает, какой реально работает.
+
+## Структура проекта
+
+```
+backend/        FastAPI dashboard + 3 прокси + сервисы
+frontend/       Vue 3 + Vite + Tailwind, билдится в frontend/dist
+data/           SQLite-статистика и ваш конфиг (gitignored)
+start.bat       однокликовый запуск (Windows)
+start.sh        однокликовый запуск (macOS/Linux)
+```
+
+## Баги / идеи
+
+Telegram: [@notgay8](https://t.me/notgay8)
+
+PR-ы приветствуются.
+
+## Лицензия
+
+[MIT](./LICENSE) — делайте с этим всё что хотите.

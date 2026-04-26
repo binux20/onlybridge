@@ -1,5 +1,7 @@
 # OnlyBridge
 
+[English](./README.md) | [Русский](./README.ru.md)
+
 Local dashboard that bridges the free **[OnlySQ](https://my.onlysq.ru)** API into your favourite code tools.
 
 OnlySQ ships top-tier models (Claude Opus, Sonnet, Haiku, GPT, Gemini, DeepSeek, Qwen and more) for free, but its native `tool_calling` is broken and most code tools won't work out of the box. OnlyBridge runs three local proxies that translate between your tool's API format and OnlySQ, inject tool schemas via prompt-engineering and parse fenced ```json blocks back out — so things like file edits, shell commands and parallel tool calls just work.
