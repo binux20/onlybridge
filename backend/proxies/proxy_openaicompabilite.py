@@ -483,6 +483,99 @@ def merge_consecutive_same_role(messages: list[dict]) -> list[dict]:
             merged.append({"role": msg["role"], "content": msg["content"]})
     return merged
 
+
+# ─────────────────────────────────────────────
+# VISION HELPERS
+# ─────────────────────────────────────────────
+def has_images_in_anthropic_msgs(messages: list) -> bool:
+    for msg in reversed(messages):
+        if msg.get("role") == "user":
+            content = msg.get("content", [])
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "image":
+                        source = block.get("source", {})
+                        if source.get("type") == "base64" and source.get("data"):
+                            return True
+            break
+    return False
+
+
+def last_user_image_msg_idx(messages: list) -> int:
+    for idx in range(len(messages) - 1, -1, -1):
+        msg = messages[idx]
+        if msg.get("role") != "user":
+            continue
+        content = msg.get("content", [])
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "image":
+                    source = block.get("source", {})
+                    if source.get("type") == "base64" and source.get("data"):
+                        return idx
+    return -1
+
+
+async def describe_image_with_vision(session: aiohttp.ClientSession, image: dict, api_key: str, vision_model: str) -> str:
+    image_url = f"data:{image['media_type']};base64,{image['data']}"
+    body = {
+        "model": vision_model,
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Describe this image in detail. Include all visible text, UI elements, code, diagrams, or any other relevant information. Be thorough and precise."},
+                {"type": "image_url", "image_url": {"url": image_url}},
+            ],
+        }],
+        "stream": False,
+    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    try:
+        async with session.post(ONLYSQ_URL, json=body, headers=headers) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                return data["choices"][0]["message"].get("content", "[Image description unavailable]")
+            err = await resp.text()
+            log.warning(f"[VISION] Ошибка {resp.status}: {err[:200]}")
+            return f"[Image description failed: HTTP {resp.status}]"
+    except Exception as e:
+        log.error(f"[VISION] Exception: {e}")
+        return f"[Image description failed: {e}]"
+
+
+def anthropic_content_to_openai_multimodal(content) -> list[dict] | str:
+    if isinstance(content, str):
+        return content
+    parts: list[dict] = []
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        t = block.get("type")
+        if t == "text":
+            text = block.get("text", "")
+            if text:
+                parts.append({"type": "text", "text": text})
+        elif t == "tool_use":
+            inp = json.dumps(block.get("input", {}), ensure_ascii=False)
+            parts.append({"type": "text", "text": f'```json\n{{"name": "{block["name"]}", "arguments": {inp}}}\n```'})
+        elif t == "tool_result":
+            c = block.get("content", "")
+            if isinstance(c, list):
+                c = "\n".join(b.get("text", "") for b in c if isinstance(b, dict) and b.get("type") == "text")
+            tid = block.get("tool_use_id", "")
+            parts.append({"type": "text", "text": f"[TOOL_RESULT id={tid}]\n{c}\n[/TOOL_RESULT]"})
+        elif t == "image":
+            source = block.get("source", {})
+            if source.get("type") == "base64" and source.get("data"):
+                parts.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{source.get('media_type', 'image/jpeg')};base64,{source.get('data')}"},
+                })
+            else:
+                parts.append({"type": "text", "text": "[image omitted]"})
+    return parts if parts else ""
+
+
 # ─────────────────────────────────────────────
 # КОНВЕРТАЦИЯ: Anthropic internal → OpenAI для OnlySQ
 # ─────────────────────────────────────────────
@@ -524,10 +617,12 @@ def flatten_anthropic_content(content, image_descriptions: dict = None) -> str:
 def anthropic_messages_to_openai(
     anthropic_body: dict,
     image_descriptions: dict = None,
+    use_multimodal: bool = False,
 ) -> list[dict]:
     """
     Конвертирует Anthropic-формат (внутренний) → OpenAI messages для OnlySQ.
     Тулы и tool_result превращаются в обычный текст.
+    use_multimodal: если True — последнее user-сообщение с картинкой идёт как image_url.
     """
     global _reminder_counter
     system_parts: list[str] = []
@@ -542,15 +637,28 @@ def anthropic_messages_to_openai(
     if tools:
         system_parts.append(build_tools_system(tools))
 
+    raw_msgs = anthropic_body.get("messages", [])
+    multimodal_idx = last_user_image_msg_idx(raw_msgs) if use_multimodal else -1
+
     messages: list[dict] = []
-    for msg_idx, msg in enumerate(anthropic_body.get("messages", [])):
+    for msg_idx, msg in enumerate(raw_msgs):
         role    = msg.get("role", "user")
         content = msg.get("content", "")
         final_r = role if role in ("user", "assistant", "system") else "user"
         msg_img_descs = (image_descriptions or {}).get(msg_idx, {})
 
-        text = flatten_anthropic_content(content, msg_img_descs)
-        text = _BILLING_RE.sub("", text).strip()
+        if msg_idx == multimodal_idx and final_r == "user":
+            converted = anthropic_content_to_openai_multimodal(content)
+            if isinstance(converted, list):
+                _reminder_counter += 1
+                if _reminder_counter % 6 == 0:
+                    converted.append({"type": "text", "text": "\n\n[Reminder: use ```json blocks for ALL tool calls. No XML!]"})
+                messages.append({"role": final_r, "content": converted})
+                continue
+            text = _BILLING_RE.sub("", converted).strip()
+        else:
+            text = flatten_anthropic_content(content, msg_img_descs)
+            text = _BILLING_RE.sub("", text).strip()
 
         if final_r == "user":
             _reminder_counter += 1
@@ -564,19 +672,25 @@ def anthropic_messages_to_openai(
     if system_parts:
         sys_text = "\n\n".join(system_parts) + "\n\n"
         if messages and messages[0]["role"] in ("user", "system"):
-            messages[0]["content"] = sys_text + messages[0]["content"]
+            first_content = messages[0]["content"]
+            if isinstance(first_content, list):
+                messages[0]["content"] = [{"type": "text", "text": sys_text}] + first_content
+            else:
+                messages[0]["content"] = sys_text + first_content
         elif messages:
             messages.insert(0, {"role": "user", "content": sys_text})
         else:
             messages.append({"role": "user", "content": sys_text})
 
+    if use_multimodal:
+        return messages
     return merge_consecutive_same_role(messages)
 
 
-def build_onlysq_body(anthropic_body: dict, model: str) -> dict:
+def build_onlysq_body(anthropic_body: dict, model: str, image_descriptions: dict = None, use_multimodal: bool = False) -> dict:
     return {
         "model":    model,
-        "messages": anthropic_messages_to_openai(anthropic_body),
+        "messages": anthropic_messages_to_openai(anthropic_body, image_descriptions, use_multimodal),
         "stream":   False,
     }
 
@@ -1117,13 +1231,96 @@ async def openai_chat_completions(request: Request):
 
     log.info(f"\n[OPENAI] model={model} | agent={label} | stream={is_stream} | tools={len(anthropic_tools)}")
 
-    onlysq_body = build_onlysq_body(anthropic_body, model)
+    started = time.time()
+    image_descriptions = None
+    use_multimodal = False
+
+    if has_images_in_anthropic_msgs(anthropic_msgs):
+        log.info("[IMAGE] Обнаружены изображения в последнем user-сообщении")
+        vision_capable = config.is_vision_capable(model)
+
+        if vision_capable is False:
+            log.info(f"[IMAGE] {model} не поддерживает vision (кэш), fallback")
+        else:
+            use_multimodal = True
+            test_body = build_onlysq_body(anthropic_body, model, use_multimodal=True)
+            if is_stream and _read_stream_mode() == "realtime":
+                test_body["stream"] = True
+            test_resp, _ = await call_onlysq(test_body, is_sub)
+            if test_resp is not None:
+                if vision_capable is None:
+                    config.set_vision_capable(model, True)
+                log.info(f"[IMAGE] {model} поддерживает vision")
+                onlysq_body = test_body
+                resp = test_resp
+                prompt_tok = tokens_from_messages(onlysq_body.get("messages"))
+                if is_stream:
+                    captured: list[str] = []
+                    async def gen():
+                        try:
+                            async for chunk in stream_sse_openai(resp, model, onlysq_body, is_sub):
+                                captured.append(chunk)
+                                yield chunk
+                        except asyncio.CancelledError:
+                            pass
+                        finally:
+                            resp.release()
+                            completion_tok = count_tokens("".join(captured))
+                            log_request(source="openai_compat", model=model, prompt_tokens=prompt_tok,
+                                        completion_tokens=completion_tok,
+                                        latency_ms=int((time.time() - started) * 1000), status="ok")
+                    return StreamingResponse(gen(), media_type="text/event-stream")
+                try:
+                    data = await resp.json()
+                    text = data["choices"][0]["message"].get("content", "")
+                    log_request(source="openai_compat", model=model, prompt_tokens=prompt_tok,
+                                completion_tokens=count_tokens(text),
+                                latency_ms=int((time.time() - started) * 1000), status="ok")
+                    return JSONResponse(to_openai_chat_response(text, model))
+                except Exception as e:
+                    log.error(f"[OPENAI] parse error: {e}")
+                    return JSONResponse({"error": {"message": str(e), "type": "server_error"}}, status_code=500)
+                finally:
+                    resp.release()
+            else:
+                if vision_capable is None:
+                    config.set_vision_capable(model, False)
+                log.info(f"[IMAGE] {model} не поддерживает vision")
+
+        # fallback: Gemini описывает картинки только в последнем user-сообщении
+        use_multimodal = False
+        vision_model = config.get_vision_model()
+        target_idx = last_user_image_msg_idx(anthropic_msgs)
+        image_descriptions = {}
+        if target_idx >= 0:
+            target_msg = anthropic_msgs[target_idx]
+            content = target_msg.get("content", [])
+            if isinstance(content, list):
+                msg_images = {}
+                img_idx = 0
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "image":
+                        source = block.get("source", {})
+                        if source.get("type") == "base64" and source.get("data"):
+                            image = {
+                                "media_type": source.get("media_type", "image/jpeg"),
+                                "data": source.get("data"),
+                            }
+                            vision_key = await pool.acquire(is_sub=True)
+                            log.info(f"[IMAGE] Описываем {target_idx}:{img_idx} через {vision_model}")
+                            description = await describe_image_with_vision(_session, image, vision_key, vision_model)
+                            msg_images[img_idx] = description
+                            log.info(f"[IMAGE] Описание: {description[:100]}...")
+                        img_idx += 1
+                if msg_images:
+                    image_descriptions[target_idx] = msg_images
+
+    onlysq_body = build_onlysq_body(anthropic_body, model, image_descriptions, use_multimodal)
     if is_stream and _read_stream_mode() == "realtime":
         onlysq_body["stream"] = True
     log.info(f"[ONLYSQ] messages: {len(onlysq_body['messages'])} | stream_to_onlysq={onlysq_body.get('stream')}")
 
     prompt_tok = tokens_from_messages(onlysq_body.get("messages"))
-    started = time.time()
 
     resp, key = await call_onlysq(onlysq_body, is_sub)
     if resp is None:

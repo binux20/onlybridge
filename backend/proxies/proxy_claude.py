@@ -366,6 +366,22 @@ def has_images_in_body(body: dict) -> bool:
     return False
 
 
+def last_user_image_msg_idx(messages: list) -> int:
+    """Индекс последнего user-сообщения, содержащего хотя бы одну картинку. -1 если нет."""
+    for idx in range(len(messages) - 1, -1, -1):
+        msg = messages[idx]
+        if msg.get("role") != "user":
+            continue
+        content = msg.get("content", [])
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "image":
+                    source = block.get("source", {})
+                    if source.get("type") == "base64" and source.get("data"):
+                        return idx
+    return -1
+
+
 async def describe_image_with_vision(session: aiohttp.ClientSession, image: dict, api_key: str, vision_model: str = None) -> str:
     """
     Отправляет изображение в vision-модель и получает описание.
@@ -747,7 +763,10 @@ def to_openai_messages(body: dict, image_descriptions: dict = None, use_multimod
     # Собираем сообщения
     messages: list[dict] = []
 
-    for msg_idx, msg in enumerate(body.get("messages", [])):
+    raw_msgs = body.get("messages", [])
+    multimodal_idx = last_user_image_msg_idx(raw_msgs) if use_multimodal else -1
+
+    for msg_idx, msg in enumerate(raw_msgs):
         role = msg.get("role", "user")
         content = msg.get("content", "")
         final_r = role if role in ("user", "assistant", "system") else "user"
@@ -755,11 +774,10 @@ def to_openai_messages(body: dict, image_descriptions: dict = None, use_multimod
         # Получаем описания изображений для этого сообщения
         msg_img_descs = image_descriptions.get(msg_idx, {}) if image_descriptions else {}
 
-        if use_multimodal and final_r == "user":
-            # Multimodal: передаём изображения напрямую
+        if msg_idx == multimodal_idx and final_r == "user":
+            # Multimodal: только последнее user-сообщение с картинками
             converted = convert_content_to_openai_multimodal(content, include_images=True)
             if isinstance(converted, list):
-                # Добавляем reminder в конец если нужно
                 _reminder_counter += 1
                 if _reminder_counter % 6 == 0:
                     converted.append({"type": "text", "text": "\n\n[Reminder: use ```json blocks for ALL tool calls. No XML!]"})
@@ -772,7 +790,7 @@ def to_openai_messages(body: dict, image_descriptions: dict = None, use_multimod
                 if text:
                     messages.append({"role": final_r, "content": text})
         else:
-            # Текстовый режим: изображения заменяются описаниями
+            # Текстовый режим: картинки -> [IMAGE DESCRIPTION] (если есть desc) или [image in conversation history]
             text = flatten_content(content, msg_img_descs)
             text = _BILLING_RE.sub("", text).strip()
 
@@ -1346,9 +1364,12 @@ async def messages(request: Request):
         use_multimodal = False
         image_descriptions = {}
 
-        # Собираем все изображения с их позициями
-        for msg_idx, msg in enumerate(body.get("messages", [])):
-            content = msg.get("content", [])
+        # Описываем картинки только в последнем user-сообщении.
+        # Старые картинки в истории получат [image in conversation history] через flatten_content.
+        target_idx = last_user_image_msg_idx(body.get("messages", []))
+        if target_idx >= 0:
+            target_msg = body["messages"][target_idx]
+            content = target_msg.get("content", [])
             if isinstance(content, list):
                 msg_images = {}
                 img_idx = 0
@@ -1360,15 +1381,14 @@ async def messages(request: Request):
                                 "media_type": source.get("media_type", "image/jpeg"),
                                 "data": source.get("data"),
                             }
-                            # Получаем любой ключ для vision запроса (не тратит Claude лимит)
-                            vision_key = await pool.acquire(is_sub=True)  # vision использует sub лимит
-                            log.info(f"[IMAGE] Описываем изображение {msg_idx}:{img_idx} через {vision_model}")
+                            vision_key = await pool.acquire(is_sub=True)
+                            log.info(f"[IMAGE] Описываем изображение {target_idx}:{img_idx} через {vision_model}")
                             description = await describe_image_with_vision(_session, image, vision_key, vision_model)
                             msg_images[img_idx] = description
                             log.info(f"[IMAGE] Описание получено: {description[:100]}...")
                         img_idx += 1
                 if msg_images:
-                    image_descriptions[msg_idx] = msg_images
+                    image_descriptions[target_idx] = msg_images
 
     openai_body = to_openai_body(body, model, image_descriptions, use_multimodal)
     resp, key = await call_onlysq(openai_body, is_sub)
