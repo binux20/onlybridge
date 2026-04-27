@@ -27,7 +27,11 @@ const preview = ref<{ tool: ToolId; data: SetupResult } | null>(null)
 const models = ref<ModelInfo[]>([])
 const mainModel = ref('')
 const subModel = ref('')
+const savedMain = ref('')
+const savedSub = ref('')
 const targetProxy = ref<ToolId>('claude')
+const modelSaving = ref(false)
+const modelSaved = ref(false)
 
 let timer: number | undefined
 
@@ -39,6 +43,10 @@ function modelsForProxy(c: AppConfig, tool: ToolId): { main: string; sub: string
   }
 }
 
+const hasUnsaved = computed(() =>
+  mainModel.value !== savedMain.value || subModel.value !== savedSub.value
+)
+
 async function loadAll() {
   try {
     const c = await api.getConfig()
@@ -46,6 +54,8 @@ async function loadAll() {
     const cur = modelsForProxy(c, targetProxy.value)
     mainModel.value = cur.main
     subModel.value = cur.sub
+    savedMain.value = cur.main
+    savedSub.value = cur.sub
   } catch (e: any) { err.value = String(e) }
   await Promise.all((['claude', 'opencode', 'openai_compat'] as ToolId[]).map(async id => {
     try {
@@ -101,27 +111,42 @@ async function stopTool(tool: ToolId) {
   finally { busy.value[tool] = false }
 }
 
-let suppressSave = false
-
-async function saveProxyModel(field: 'main' | 'sub', value: string) {
-  if (!value) return
+async function saveModels() {
+  if (!hasUnsaved.value) return
+  modelSaving.value = true
+  modelSaved.value = false
   try {
-    await api.patchConfig({ proxy_models: { [targetProxy.value]: { [field]: value } } } as any)
+    const patch: any = { proxy_models: { [targetProxy.value]: { main: mainModel.value, sub: subModel.value } } }
+    await api.patchConfig(patch)
+    savedMain.value = mainModel.value
+    savedSub.value = subModel.value
+    if (cfg.value) {
+      const pm = ((cfg.value as any).proxy_models ||= {})
+      pm[targetProxy.value] = { main: mainModel.value, sub: subModel.value }
+    }
+    modelSaved.value = true
+    setTimeout(() => { modelSaved.value = false }, 2000)
   } catch (e: any) { err.value = String(e) }
+  finally { modelSaving.value = false }
 }
 
-watch(mainModel, v => { if (!suppressSave && v) saveProxyModel('main', v) })
-watch(subModel,  v => { if (!suppressSave && v) saveProxyModel('sub', v) })
-
-watch(targetProxy, async () => {
+watch(targetProxy, () => {
   if (!cfg.value) return
-  suppressSave = true
   const cur = modelsForProxy(cfg.value, targetProxy.value)
   mainModel.value = cur.main
   subModel.value = cur.sub
-  await Promise.resolve()
-  suppressSave = false
+  savedMain.value = cur.main
+  savedSub.value = cur.sub
 })
+
+async function attemptStart(tool: ToolId) {
+  if (tool === targetProxy.value && hasUnsaved.value) {
+    const choice = window.confirm(t('sidebar.unsaved.body'))
+    if (!choice) return
+    await saveModels()
+  }
+  await showPreview(tool)
+}
 
 function badgeClass(s?: ProxyInfo | null) {
   if (!s) return ''
@@ -175,9 +200,17 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
         </select>
       </div>
 
-      <p v-if="!showSubAgent" class="mono text-[11px] mt-3" :style="{ color: 'var(--text-muted)', lineHeight: 1.5 }">
+      <p v-if="!showSubAgent" class="mono text-[11px] mt-3 mb-3" :style="{ color: 'var(--text-muted)', lineHeight: 1.5 }">
         {{ t('sidebar.subagent.note') }}
       </p>
+
+      <div class="mt-3 flex items-center gap-2">
+        <button class="btn btn-primary" :disabled="!hasUnsaved || modelSaving" @click="saveModels">
+          {{ modelSaving ? t('sidebar.saving') : t('sidebar.save') }}
+        </button>
+        <span v-if="modelSaved" class="mono text-[11px]" :style="{ color: 'var(--accent)' }">{{ t('sidebar.saved') }}</span>
+        <span v-else-if="hasUnsaved" class="mono text-[11px]" :style="{ color: 'var(--text-muted)' }">{{ t('sidebar.dirty') }}</span>
+      </div>
     </aside>
 
     <div class="flex-1 min-w-0">
@@ -221,7 +254,7 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
                 v-if="statuses[x.id]?.status !== 'running'"
                 class="btn btn-primary"
                 :disabled="busy[x.id] || !cfg?.has_key"
-                @click="showPreview(x.id)"
+                @click="attemptStart(x.id)"
               >{{ t('setup.btn.start') }}</button>
               <button
                 v-else

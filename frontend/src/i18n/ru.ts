@@ -45,6 +45,11 @@ export const ru: Record<string, string> = {
   'sidebar.proxy.opencode': 'OPENCODE',
   'sidebar.proxy.openai_compat': 'OPENAI COMPATIBLE',
   'sidebar.subagent.note': 'OpenAI-совместимые код-инструменты обычно не запускают отдельные суб-агент задачи. Если запускают — их выполняет та же ОСНОВНАЯ модель.',
+  'sidebar.save': 'СОХРАНИТЬ',
+  'sidebar.saving': 'СОХРАНЯЮ',
+  'sidebar.saved': 'СОХРАНЕНО',
+  'sidebar.dirty': 'не сохранено',
+  'sidebar.unsaved.body': 'Вы изменили модель, но не сохранили. Нажмите OK чтобы сохранить и запустить прокси, либо Отмена чтобы продолжить править.',
 
   'stats.title': 'СТАТИСТИКА',
   'stats.period.today': 'СЕГОДНЯ',

@@ -97,6 +97,26 @@ async def status(tool: str) -> dict[str, Any]:
     }
 
 
+async def _push_models_to_proxy(tool: str, model: str | None, sub_model: str | None) -> None:
+    proxy_name = _TOOL_TO_PROXY.get(tool)
+    if not proxy_name:
+        return
+    port = cfg.PROXY_PORTS[proxy_name]
+    payload: dict[str, Any] = {}
+    if model:
+        payload["main_model"] = model
+    if sub_model:
+        payload["sub_model"] = sub_model
+    if not payload:
+        return
+    timeout = aiohttp.ClientTimeout(total=2)
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as s:
+            await s.post(f"http://127.0.0.1:{port}/config", json=payload)
+    except (aiohttp.ClientError, asyncio.TimeoutError):
+        pass
+
+
 @router.post("/{tool}/start")
 async def start(tool: str, body: SetupBody = SetupBody()) -> dict[str, Any]:
     if tool not in _TOOL_TO_PROXY:
@@ -104,7 +124,14 @@ async def start(tool: str, body: SetupBody = SetupBody()) -> dict[str, Any]:
     mp = _proxy_for(tool)
     if not (cfg.load_config().get("onlysq_key") or "").strip():
         raise HTTPException(status_code=400, detail="OnlySQ key not configured")
+
+    if mp.status() == "running":
+        await mp.stop()
     proc_info = await mp.start()
+
+    cur = cfg.load_config()
+    model, sub_model = _models_for_tool(cur, tool)
+    await _push_models_to_proxy(tool, model, sub_model)
 
     if tool == "openai_compat":
         return {
@@ -116,12 +143,11 @@ async def start(tool: str, body: SetupBody = SetupBody()) -> dict[str, Any]:
                 "written": False,
                 "note": "manual setup",
             },
+            "model": model,
         }
 
-    cur = cfg.load_config()
-    model, sub_model = _models_for_tool(cur, tool)
     fn = cw.SETUP_FUNCS[tool]
-    kwargs = {"dry_run": not body.confirm, "model": model}
+    kwargs = {"dry_run": False, "model": model}
     if tool == "opencode":
         kwargs["sub_model"] = sub_model
     write_res = fn(_proxy_url_for(tool), **kwargs)

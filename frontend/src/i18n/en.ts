@@ -48,6 +48,11 @@ export const en: Record<string, string> = {
   'sidebar.proxy.opencode': 'OPENCODE',
   'sidebar.proxy.openai_compat': 'OPENAI COMPATIBLE',
   'sidebar.subagent.note': 'OpenAI-compatible code tools usually do not spawn separate sub-agent tasks. If they do, the same MAIN model handles them.',
+  'sidebar.save': 'SAVE',
+  'sidebar.saving': 'SAVING',
+  'sidebar.saved': 'SAVED',
+  'sidebar.dirty': 'unsaved changes',
+  'sidebar.unsaved.body': 'You changed the model but did not save. Click OK to save and start the proxy, or Cancel to keep editing.',
 
   // stats
   'stats.title': 'STATS',
