@@ -160,6 +160,14 @@ def setup_opencode(proxy_url: str, dry_run: bool = False, model: str | None = No
     main_label = model or "OnlyBridge Main"
     sub_label = sub_model or model or "OnlyBridge Sub"
 
+    def _model_entry(name: str) -> dict:
+        return {
+            "name": name,
+            "attachment": True,
+            "capabilities": {"vision": True},
+            "modalities": {"input": ["text", "image"], "output": ["text"]},
+        }
+
     def transform(data: dict) -> dict:
         out = dict(data)
         providers = dict(out.get("provider") or {})
@@ -168,8 +176,8 @@ def setup_opencode(proxy_url: str, dry_run: bool = False, model: str | None = No
             "name": "OnlyBridge",
             "options": {"baseURL": base_url, "apiKey": _PLACEHOLDER_KEY},
             "models": {
-                "main": {"name": main_label},
-                "sub":  {"name": sub_label},
+                "main": _model_entry(main_label),
+                "sub":  _model_entry(sub_label),
             },
         }
         out["provider"] = providers

@@ -150,4 +150,14 @@ export const en: Record<string, string> = {
   'settings.stream.legacy': 'LEGACY',
   'settings.stream.legacy.desc': 'Buffered: proxy waits for the full reply, then fakes a stream. Slower UX but the most stable for tools.',
   'settings.stream.note': 'Applies to OpenCode and OpenAI Compatible only. Claude Code is always streamed too, but its terminal UI buffers the response before showing it, so token-by-token output is not visible there.',
+
+  // vision
+  'docs.vision.title': 'IMAGE / VISION SUPPORT',
+  'docs.vision.intro': 'OnlyBridge handles images for all three proxies: if the selected model supports vision, the image is sent to it directly; otherwise the image is automatically described by the configured vision model (Gemini by default) and the description is injected as text. Only the image in the latest user message is processed - older images in the history become [image in conversation history] to save traffic.',
+  'docs.vision.flow.title': 'HOW IT WORKS',
+  'docs.vision.flow.body': '1. Detect images in the latest user message.\n2. Try a multimodal request to the main model. On 200 OK the model is cached as vision-capable.\n3. If the model returns an error, fall back to the vision model: it describes the image, and the description is injected as [IMAGE DESCRIPTION] into the text request to the main model.\n4. The vision-capability cache is stored per-model in proxy_config.json so we do not retry every time.',
+  'docs.vision.opencode.title': 'OPENCODE',
+  'docs.vision.opencode.body': 'OpenCode filters images on the client side: if the model is not marked as vision-capable in opencode.json, the picture never leaves OpenCode and is replaced with an error like "this model does not support image input". Setup & Start now writes capabilities.vision: true and modalities.input: [text, image] for the OnlyBridge models, so OpenCode lets the image through. If you still see this error, clear ~/.cache/opencode and restart OpenCode.',
+  'docs.vision.clients.title': 'OTHER OPENAI-COMPATIBLE CLIENTS',
+  'docs.vision.clients.body': 'aider, Continue, Cline, Kilo Code, Zed and other OpenAI-compatible clients also decide on the client side whether to send images, based on their own model lists or capability flags. If your client refuses to send images to the proxy, mark the selected model as vision-capable in the client settings (the exact field varies). Once the image reaches the proxy, the rest of the flow (multimodal try plus Gemini fallback) works automatically.',
 }

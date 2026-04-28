@@ -140,6 +140,26 @@ const cols = [
 
   <p class="text-[12px] mb-6" :style="{ color: 'var(--text-dim)', lineHeight: 1.5 }">{{ t('docs.stream.claude.note') }}</p>
 
+  <div class="mb-6 mt-10">
+    <div class="h2 mb-2">{{ t('docs.vision.title') }}</div>
+    <p :style="{ color: 'var(--text-dim)', maxWidth: '720px', lineHeight: 1.6 }">{{ t('docs.vision.intro') }}</p>
+  </div>
+
+  <section class="card mb-4" :style="{ padding: '20px' }">
+    <div class="label mb-2" :style="{ color: 'var(--accent)' }">{{ t('docs.vision.flow.title') }}</div>
+    <p :style="{ color: 'var(--text)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }">{{ t('docs.vision.flow.body') }}</p>
+  </section>
+
+  <section class="card mb-4" :style="{ padding: '20px' }">
+    <div class="label mb-2">{{ t('docs.vision.opencode.title') }}</div>
+    <p :style="{ color: 'var(--text)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }">{{ t('docs.vision.opencode.body') }}</p>
+  </section>
+
+  <section class="card mb-6" :style="{ padding: '20px' }">
+    <div class="label mb-2">{{ t('docs.vision.clients.title') }}</div>
+    <p :style="{ color: 'var(--text)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }">{{ t('docs.vision.clients.body') }}</p>
+  </section>
+
   <p class="mono text-[12px] mt-4" :style="{ color: 'var(--text-dim)', lineHeight: 1.5 }">
     <template v-for="(part, i) in t('docs.disclaimer.bottom').split('{link}')" :key="'bot-'+i">
       <span>{{ part }}</span>

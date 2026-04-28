@@ -481,14 +481,28 @@ def openai_messages_to_anthropic(messages: list[dict]) -> tuple[list[dict], str]
 
         # Обычное сообщение
         if isinstance(content, list):
-            # Может быть multimodal
             blocks = []
             for b in content:
                 if not isinstance(b, dict): continue
-                if b.get("type") == "text":
+                bt = b.get("type")
+                if bt == "text":
                     blocks.append({"type": "text", "text": b.get("text", "")})
-                elif b.get("type") == "image_url":
-                    url = b.get("image_url", {}).get("url", "")
+                elif bt in ("image_url", "image"):
+                    url = ""
+                    if bt == "image_url":
+                        iu = b.get("image_url")
+                        url = (iu.get("url", "") if isinstance(iu, dict) else (iu or ""))
+                    else:
+                        src = b.get("source", {})
+                        if isinstance(src, dict):
+                            if src.get("type") == "base64" and src.get("data"):
+                                blocks.append({"type": "image", "source": {
+                                    "type": "base64",
+                                    "media_type": src.get("media_type", "image/jpeg"),
+                                    "data": src.get("data"),
+                                }})
+                                continue
+                            url = src.get("url", "") or src.get("data", "")
                     if url.startswith("data:"):
                         import re as _re
                         m = _re.match(r"data:([^;]+);base64,(.+)", url)
@@ -496,6 +510,12 @@ def openai_messages_to_anthropic(messages: list[dict]) -> tuple[list[dict], str]
                             blocks.append({"type": "image", "source": {
                                 "type": "base64", "media_type": m.group(1), "data": m.group(2)
                             }})
+                    elif url.startswith("http://") or url.startswith("https://"):
+                        blocks.append({"type": "image", "source": {
+                            "type": "url", "url": url, "media_type": "image/jpeg",
+                        }})
+                    else:
+                        log.warning(f"[OPENAI/IN] image_url пропущен: {(url or '')[:80]!r}")
             result.append({"role": role, "content": blocks})
         else:
             result.append({"role": role, "content": content})
@@ -530,16 +550,27 @@ def merge_consecutive_same_role(messages: list[dict]) -> list[dict]:
 # ─────────────────────────────────────────────
 # VISION HELPERS
 # ─────────────────────────────────────────────
+def _is_image_block(block: dict) -> bool:
+    if not isinstance(block, dict) or block.get("type") != "image":
+        return False
+    source = block.get("source", {})
+    if not isinstance(source, dict):
+        return False
+    if source.get("type") == "base64" and source.get("data"):
+        return True
+    if source.get("type") == "url" and source.get("url"):
+        return True
+    return False
+
+
 def has_images_in_anthropic_msgs(messages: list) -> bool:
     for msg in reversed(messages):
         if msg.get("role") == "user":
             content = msg.get("content", [])
             if isinstance(content, list):
                 for block in content:
-                    if isinstance(block, dict) and block.get("type") == "image":
-                        source = block.get("source", {})
-                        if source.get("type") == "base64" and source.get("data"):
-                            return True
+                    if _is_image_block(block):
+                        return True
             break
     return False
 
@@ -552,11 +583,35 @@ def last_user_image_msg_idx(messages: list) -> int:
         content = msg.get("content", [])
         if isinstance(content, list):
             for block in content:
-                if isinstance(block, dict) and block.get("type") == "image":
-                    source = block.get("source", {})
-                    if source.get("type") == "base64" and source.get("data"):
-                        return idx
+                if _is_image_block(block):
+                    return idx
     return -1
+
+
+async def describe_image_with_vision_url(session: aiohttp.ClientSession, image_url: str, api_key: str, vision_model: str) -> str:
+    body = {
+        "model": vision_model,
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Describe this image in detail. Include all visible text, UI elements, code, diagrams, or any other relevant information. Be thorough and precise."},
+                {"type": "image_url", "image_url": {"url": image_url}},
+            ],
+        }],
+        "stream": False,
+    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    try:
+        async with session.post(ONLYSQ_URL, json=body, headers=headers) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                return data["choices"][0]["message"].get("content", "[Image description unavailable]")
+            err = await resp.text()
+            log.warning(f"[VISION] Ошибка {resp.status}: {err[:200]}")
+            return f"[Image description failed: HTTP {resp.status}]"
+    except Exception as e:
+        log.error(f"[VISION] Exception: {e}")
+        return f"[Image description failed: {e}]"
 
 
 async def describe_image_with_vision(session: aiohttp.ClientSession, image: dict, api_key: str, vision_model: str) -> str:
@@ -609,11 +664,13 @@ def anthropic_content_to_openai_multimodal(content) -> list[dict] | str:
             parts.append({"type": "text", "text": f"[TOOL_RESULT id={tid}]\n{c}\n[/TOOL_RESULT]"})
         elif t == "image":
             source = block.get("source", {})
-            if source.get("type") == "base64" and source.get("data"):
+            if isinstance(source, dict) and source.get("type") == "base64" and source.get("data"):
                 parts.append({
                     "type": "image_url",
                     "image_url": {"url": f"data:{source.get('media_type', 'image/jpeg')};base64,{source.get('data')}"},
                 })
+            elif isinstance(source, dict) and source.get("type") == "url" and source.get("url"):
+                parts.append({"type": "image_url", "image_url": {"url": source["url"]}})
             else:
                 parts.append({"type": "text", "text": "[image omitted]"})
     return parts if parts else ""
@@ -646,7 +703,11 @@ def flatten_anthropic_content(content, image_descriptions: dict = None) -> str:
             parts.append(f"[TOOL_RESULT id={tid}]\n{c}\n[/TOOL_RESULT]")
         elif t == "image":
             source = block.get("source", {})
-            if source.get("type") == "base64" and source.get("data"):
+            is_img = isinstance(source, dict) and (
+                (source.get("type") == "base64" and source.get("data"))
+                or (source.get("type") == "url" and source.get("url"))
+            )
+            if is_img:
                 if image_descriptions and image_idx in image_descriptions:
                     parts.append(f"[IMAGE DESCRIPTION]:\n{image_descriptions[image_idx]}\n[/IMAGE DESCRIPTION]")
                 else:
@@ -1336,8 +1397,25 @@ async def openai_chat_completions(request: Request):
     is_stream      = bool(openai_body_in.get("stream", False))
     requested_model = openai_body_in.get("model") or config.get_main_model()
 
+    in_msgs = openai_body_in.get("messages", [])
+    _img_count = 0
+    for _m in in_msgs:
+        _c = _m.get("content")
+        if isinstance(_c, list):
+            for _b in _c:
+                if isinstance(_b, dict) and _b.get("type") in ("image_url", "image"):
+                    _img_count += 1
+    if _img_count:
+        log.info(f"[OPENAI/IN] входящих image-блоков: {_img_count} в {len(in_msgs)} сообщениях")
+
     # Конвертируем OpenAI → Anthropic внутренний формат
-    anthropic_msgs, system_text = openai_messages_to_anthropic(openai_body_in.get("messages", []))
+    anthropic_msgs, system_text = openai_messages_to_anthropic(in_msgs)
+    _conv_imgs = sum(
+        1 for m in anthropic_msgs if isinstance(m.get("content"), list)
+        for b in m["content"] if isinstance(b, dict) and b.get("type") == "image"
+    )
+    if _img_count or _conv_imgs:
+        log.info(f"[OPENAI/IN] после конверсии image-блоков: {_conv_imgs}")
 
     # Извлекаем тулы (OpenAI формат function tools)
     openai_tools = openai_body_in.get("tools", [])
@@ -1436,19 +1514,22 @@ async def openai_chat_completions(request: Request):
                 msg_images = {}
                 img_idx = 0
                 for block in content:
-                    if isinstance(block, dict) and block.get("type") == "image":
-                        source = block.get("source", {})
+                    if not (isinstance(block, dict) and block.get("type") == "image"):
+                        continue
+                    source = block.get("source", {})
+                    image_url = None
+                    if isinstance(source, dict):
                         if source.get("type") == "base64" and source.get("data"):
-                            image = {
-                                "media_type": source.get("media_type", "image/jpeg"),
-                                "data": source.get("data"),
-                            }
-                            vision_key = await pool.acquire(is_sub=True)
-                            log.info(f"[IMAGE] Описываем {target_idx}:{img_idx} через {vision_model}")
-                            description = await describe_image_with_vision(_session, image, vision_key, vision_model)
-                            msg_images[img_idx] = description
-                            log.info(f"[IMAGE] Описание: {description[:100]}...")
-                        img_idx += 1
+                            image_url = f"data:{source.get('media_type', 'image/jpeg')};base64,{source.get('data')}"
+                        elif source.get("type") == "url" and source.get("url"):
+                            image_url = source["url"]
+                    if image_url:
+                        vision_key = await pool.acquire(is_sub=True)
+                        log.info(f"[IMAGE] Описываем {target_idx}:{img_idx} через {vision_model}")
+                        description = await describe_image_with_vision_url(_session, image_url, vision_key, vision_model)
+                        msg_images[img_idx] = description
+                        log.info(f"[IMAGE] Описание: {description[:100]}...")
+                    img_idx += 1
                 if msg_images:
                     image_descriptions[target_idx] = msg_images
 
