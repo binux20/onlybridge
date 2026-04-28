@@ -29,6 +29,10 @@ const mainModel = ref('')
 const subModel = ref('')
 const savedMain = ref('')
 const savedSub = ref('')
+const mainRpm = ref<number>(3)
+const subRpm = ref<number>(10)
+const savedMainRpm = ref<number>(3)
+const savedSubRpm = ref<number>(10)
 const targetProxy = ref<ToolId>('claude')
 const modelSaving = ref(false)
 const modelSaved = ref(false)
@@ -43,8 +47,21 @@ function modelsForProxy(c: AppConfig, tool: ToolId): { main: string; sub: string
   }
 }
 
+function rpmForProxy(c: AppConfig, tool: ToolId): { main: number; sub: number } {
+  const pr = (c as any).proxy_rpm?.[tool] || {}
+  const m = parseInt(pr.main, 10)
+  const s = parseInt(pr.sub, 10)
+  return {
+    main: Number.isFinite(m) && m >= 1 ? m : 3,
+    sub: Number.isFinite(s) && s >= 1 ? s : 10,
+  }
+}
+
 const hasUnsaved = computed(() =>
-  mainModel.value !== savedMain.value || subModel.value !== savedSub.value
+  mainModel.value !== savedMain.value
+  || subModel.value !== savedSub.value
+  || mainRpm.value !== savedMainRpm.value
+  || subRpm.value !== savedSubRpm.value
 )
 
 async function loadAll() {
@@ -56,6 +73,11 @@ async function loadAll() {
     subModel.value = cur.sub
     savedMain.value = cur.main
     savedSub.value = cur.sub
+    const rpm = rpmForProxy(c, targetProxy.value)
+    mainRpm.value = rpm.main
+    subRpm.value = rpm.sub
+    savedMainRpm.value = rpm.main
+    savedSubRpm.value = rpm.sub
   } catch (e: any) { err.value = String(e) }
   await Promise.all((['claude', 'opencode', 'openai_compat'] as ToolId[]).map(async id => {
     try {
@@ -116,13 +138,24 @@ async function saveModels() {
   modelSaving.value = true
   modelSaved.value = false
   try {
-    const patch: any = { proxy_models: { [targetProxy.value]: { main: mainModel.value, sub: subModel.value } } }
+    const m = Math.max(1, parseInt(String(mainRpm.value), 10) || 1)
+    const s = Math.max(1, parseInt(String(subRpm.value), 10) || 1)
+    const patch: any = {
+      proxy_models: { [targetProxy.value]: { main: mainModel.value, sub: subModel.value } },
+      proxy_rpm: { [targetProxy.value]: { main: m, sub: s } },
+    }
     await api.patchConfig(patch)
     savedMain.value = mainModel.value
     savedSub.value = subModel.value
+    savedMainRpm.value = m
+    savedSubRpm.value = s
+    mainRpm.value = m
+    subRpm.value = s
     if (cfg.value) {
       const pm = ((cfg.value as any).proxy_models ||= {})
       pm[targetProxy.value] = { main: mainModel.value, sub: subModel.value }
+      const pr = ((cfg.value as any).proxy_rpm ||= {})
+      pr[targetProxy.value] = { main: m, sub: s }
     }
     modelSaved.value = true
     setTimeout(() => { modelSaved.value = false }, 2000)
@@ -137,6 +170,11 @@ watch(targetProxy, () => {
   subModel.value = cur.sub
   savedMain.value = cur.main
   savedSub.value = cur.sub
+  const rpm = rpmForProxy(cfg.value, targetProxy.value)
+  mainRpm.value = rpm.main
+  subRpm.value = rpm.sub
+  savedMainRpm.value = rpm.main
+  savedSubRpm.value = rpm.sub
 })
 
 async function attemptStart(tool: ToolId) {
@@ -202,6 +240,20 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
 
       <p v-if="!showSubAgent" class="mono text-[11px] mt-3 mb-3" :style="{ color: 'var(--text-muted)', lineHeight: 1.5 }">
         {{ t('sidebar.subagent.note') }}
+      </p>
+
+      <div class="mb-3">
+        <div class="label mb-2">{{ t('sidebar.main.rpm') }}</div>
+        <input class="input" type="number" min="1" v-model.number="mainRpm" />
+      </div>
+
+      <div v-if="showSubAgent" class="mb-3">
+        <div class="label mb-2">{{ t('sidebar.sub.rpm') }}</div>
+        <input class="input" type="number" min="1" v-model.number="subRpm" />
+      </div>
+
+      <p class="mono text-[11px] mt-1 mb-3" :style="{ color: 'var(--text-muted)', lineHeight: 1.5 }">
+        {{ t('sidebar.rpm.note') }}
       </p>
 
       <div class="mt-3 flex items-center gap-2">

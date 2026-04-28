@@ -20,6 +20,7 @@ export interface AppConfig {
   lang?: string
   stream_mode?: 'realtime' | 'legacy'
   tool_paths?: { claude?: string; opencode?: string }
+  proxy_rpm?: Record<string, { main?: number; sub?: number }>
 }
 
 export interface ModelInfo {

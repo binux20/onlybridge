@@ -216,7 +216,20 @@ class KeyPool:
             log.warning(f"[POOL] 429 - pausing {SOFT_BAN_SEC}s")
 
 
-pool = KeyPool(MAIN_RPM, SUB_RPM)
+def _read_proxy_rpm(name: str) -> tuple[int, int]:
+    try:
+        with open(_BRIDGE_CONFIG_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        slot = (data.get("proxy_rpm") or {}).get(name) or {}
+        m = int(slot.get("main")) if slot.get("main") is not None else MAIN_RPM
+        s = int(slot.get("sub")) if slot.get("sub") is not None else SUB_RPM
+        return max(1, m), max(1, s)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return MAIN_RPM, SUB_RPM
+
+
+_initial_main_rpm, _initial_sub_rpm = _read_proxy_rpm("openai_compat")
+pool = KeyPool(_initial_main_rpm, _initial_sub_rpm)
 
 # ─────────────────────────────────────────────
 # VIRTUAL LOOP
@@ -1243,6 +1256,20 @@ async def set_config(request: Request):
     if "main_model"   in body and not config.set_main_model(body["main_model"]):   errors.append(f"main_model '{body['main_model']}' not found")
     if "sub_model"    in body and not config.set_sub_model(body["sub_model"]):     errors.append(f"sub_model '{body['sub_model']}' not found")
     if "vision_model" in body and not config.set_vision_model(body["vision_model"]): errors.append(f"vision_model '{body['vision_model']}' not found")
+    if "main_rpm" in body:
+        try:
+            v = int(body["main_rpm"])
+            if v >= 1:
+                pool.main_rpm = v
+                log.info(f"[POOL] MAIN rpm -> {v}")
+        except (TypeError, ValueError): pass
+    if "sub_rpm" in body:
+        try:
+            v = int(body["sub_rpm"])
+            if v >= 1:
+                pool.sub_rpm = v
+                log.info(f"[POOL] SUB rpm -> {v}")
+        except (TypeError, ValueError): pass
     result = {"status": "error" if errors else "ok",
               "config": {"main_model": config.get_main_model(), "sub_model": config.get_sub_model(), "vision_model": config.get_vision_model()}}
     if errors: result["errors"] = errors

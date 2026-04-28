@@ -50,6 +50,9 @@ export const ru: Record<string, string> = {
   'sidebar.saved': 'СОХРАНЕНО',
   'sidebar.dirty': 'не сохранено',
   'sidebar.unsaved.body': 'Вы изменили модель, но не сохранили. Нажмите OK чтобы сохранить и запустить прокси, либо Отмена чтобы продолжить править.',
+  'sidebar.main.rpm': 'RPM ОСНОВНОЙ',
+  'sidebar.sub.rpm': 'RPM СУБ-АГЕНТА',
+  'sidebar.rpm.note': 'Запросов в минуту на прокси. Применяется на лету, перезапуск не нужен. Подбирайте под лимиты вашего тира OnlySQ, чтобы не ловить 429.',
 
   'stats.title': 'СТАТИСТИКА',
   'stats.period.today': 'СЕГОДНЯ',

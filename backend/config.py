@@ -46,6 +46,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "opencode":      {"main": "", "sub": ""},
         "openai_compat": {"main": "", "sub": ""},
     },
+    "proxy_rpm": {
+        "claude":        {"main": 3, "sub": 10},
+        "opencode":      {"main": 3, "sub": 10},
+        "openai_compat": {"main": 3, "sub": 10},
+    },
 }
 
 _lock = RLock()
@@ -99,6 +104,22 @@ def save_config(patch: dict[str, Any]) -> dict[str, Any]:
                         for field in ("main", "sub"):
                             if field in sub_dict and isinstance(sub_dict[field], (str, type(None))):
                                 slot[field] = sub_dict[field] or ""
+                        cur[proxy_name] = slot
+                    cfg[key] = cur
+                elif key == "proxy_rpm" and isinstance(value, dict):
+                    cur = cfg.get("proxy_rpm") or {}
+                    for proxy_name, sub_dict in value.items():
+                        if not isinstance(proxy_name, str) or not isinstance(sub_dict, dict):
+                            continue
+                        slot = dict(cur.get(proxy_name) or {})
+                        for field in ("main", "sub"):
+                            if field in sub_dict:
+                                try:
+                                    v = int(sub_dict[field])
+                                    if v >= 1:
+                                        slot[field] = v
+                                except (TypeError, ValueError):
+                                    pass
                         cur[proxy_name] = slot
                     cfg[key] = cur
                 else:

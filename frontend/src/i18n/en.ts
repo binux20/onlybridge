@@ -53,6 +53,9 @@ export const en: Record<string, string> = {
   'sidebar.saved': 'SAVED',
   'sidebar.dirty': 'unsaved changes',
   'sidebar.unsaved.body': 'You changed the model but did not save. Click OK to save and start the proxy, or Cancel to keep editing.',
+  'sidebar.main.rpm': 'MAIN RPM',
+  'sidebar.sub.rpm': 'SUB RPM',
+  'sidebar.rpm.note': 'Requests per minute per proxy. Applied live, no restart needed. Match your OnlySQ tier limits to avoid 429.',
 
   // stats
   'stats.title': 'STATS',

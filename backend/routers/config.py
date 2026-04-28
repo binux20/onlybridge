@@ -25,6 +25,7 @@ class ConfigPatch(BaseModel):
     stream_mode: str | None = None
     tool_paths: dict[str, str] | None = None
     proxy_models: dict[str, dict[str, str | None]] | None = None
+    proxy_rpm: dict[str, dict[str, int]] | None = None
 
 
 def _redact(c: dict[str, Any]) -> dict[str, Any]:
@@ -40,6 +41,7 @@ async def _broadcast_to_proxies(patch: dict[str, Any]) -> None:
         return
     cur = cfg.load_config()
     pm = cur.get("proxy_models") or {}
+    pr = cur.get("proxy_rpm") or {}
     timeout = aiohttp.ClientTimeout(total=2)
     async with aiohttp.ClientSession(timeout=timeout) as s:
         async def _post(name: str, port: int):
@@ -52,7 +54,14 @@ async def _broadcast_to_proxies(patch: dict[str, Any]) -> None:
                     per_patch["main_model"] = main
                 if sub:
                     per_patch["sub_model"] = sub
+            if "proxy_rpm" in per_patch:
+                rpm_slot = pr.get(name) or {}
+                if isinstance(rpm_slot.get("main"), int):
+                    per_patch["main_rpm"] = rpm_slot["main"]
+                if isinstance(rpm_slot.get("sub"), int):
+                    per_patch["sub_rpm"] = rpm_slot["sub"]
             per_patch.pop("proxy_models", None)
+            per_patch.pop("proxy_rpm", None)
             try:
                 await s.post(f"http://127.0.0.1:{port}/config", json=per_patch)
             except (aiohttp.ClientError, asyncio.TimeoutError):
