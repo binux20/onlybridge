@@ -13,6 +13,20 @@ MAX_BACKUPS = 20
 _PLACEHOLDER_KEY = "sk-placeholder"
 
 
+def _client_key() -> str:
+    """Returns the bridge_auth_token if set, otherwise the placeholder.
+    Anthropic clients require sk- prefix, so we wrap raw tokens."""
+    token = (cfg.load_config().get("bridge_auth_token") or "").strip()
+    return token or _PLACEHOLDER_KEY
+
+
+def _claude_key() -> str:
+    token = (cfg.load_config().get("bridge_auth_token") or "").strip()
+    if not token:
+        return _PLACEHOLDER_KEY
+    return token if token.startswith("sk-") else f"sk-{token}"
+
+
 @dataclass
 class SetupResult:
     tool: str
@@ -126,7 +140,7 @@ def setup_claude_code(proxy_url: str, dry_run: bool = False, model: str | None =
     def transform(data: dict) -> dict:
         env = dict(data.get("env") or {})
         env["ANTHROPIC_BASE_URL"] = proxy_url
-        env["ANTHROPIC_API_KEY"] = _PLACEHOLDER_KEY
+        env["ANTHROPIC_API_KEY"] = _claude_key()
         if model:
             env["ANTHROPIC_MODEL"] = model
         out = dict(data)
@@ -174,7 +188,7 @@ def setup_opencode(proxy_url: str, dry_run: bool = False, model: str | None = No
         providers["onlybridge"] = {
             "npm": "@ai-sdk/openai-compatible",
             "name": "OnlyBridge",
-            "options": {"baseURL": base_url, "apiKey": _PLACEHOLDER_KEY},
+            "options": {"baseURL": base_url, "apiKey": _client_key()},
             "models": {
                 "main": _model_entry(main_label),
                 "sub":  _model_entry(sub_label),
@@ -209,7 +223,7 @@ def setup_continue(proxy_url: str, dry_run: bool = False) -> SetupResult:
             "provider": "openai",
             "model": "main",
             "apiBase": api_base,
-            "apiKey": _PLACEHOLDER_KEY,
+            "apiKey": _client_key(),
         })
         out["models"] = models
         return out
@@ -235,7 +249,7 @@ def setup_aider(proxy_url: str, dry_run: bool = False) -> SetupResult:
     kept = [l for l in lines if not l.lstrip().startswith(("openai-api-base:", "openai-api-key:", "model:"))]
     kept += [
         f"openai-api-base: {api_base}",
-        f"openai-api-key: {_PLACEHOLDER_KEY}",
+        f"openai-api-key: {_client_key()}",
         "model: openai/main",
     ]
     after = "\n".join(kept).strip() + "\n"

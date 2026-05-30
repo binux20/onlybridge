@@ -51,7 +51,21 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "opencode":      {"main": 3, "sub": 10},
         "openai_compat": {"main": 3, "sub": 10},
     },
+    "bind_host": "127.0.0.1",
+    "bridge_auth_token": "",
 }
+
+
+def ensure_auth_token() -> str:
+    """Generates a random bridge_auth_token if empty. Returns the current token."""
+    with _lock:
+        cfg = load_config()
+        token = (cfg.get("bridge_auth_token") or "").strip()
+        if not token:
+            token = uuid.uuid4().hex
+            cfg["bridge_auth_token"] = token
+            _write(cfg)
+        return token
 
 _lock = RLock()
 
@@ -106,6 +120,12 @@ def save_config(patch: dict[str, Any]) -> dict[str, Any]:
                                 slot[field] = sub_dict[field] or ""
                         cur[proxy_name] = slot
                     cfg[key] = cur
+                elif key == "bind_host" and isinstance(value, str):
+                    v = value.strip()
+                    if v:
+                        cfg[key] = v
+                elif key == "bridge_auth_token" and isinstance(value, str):
+                    cfg[key] = value.strip()
                 elif key == "proxy_rpm" and isinstance(value, dict):
                     cur = cfg.get("proxy_rpm") or {}
                     for proxy_name, sub_dict in value.items():

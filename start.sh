@@ -50,6 +50,12 @@ if [ ! -f "frontend/dist/index.html" ]; then
     fi
 fi
 
+BIND_HOST=$("$PYEXE" -c "import json,os; p=os.path.join('data','config.json'); d=json.load(open(p,encoding='utf-8')) if os.path.exists(p) else {}; print((d.get('bind_host') or '127.0.0.1').strip() or '127.0.0.1')" 2>/dev/null || echo "127.0.0.1")
+
+if [ "$BIND_HOST" != "127.0.0.1" ]; then
+    echo "[OnlyBridge] Binding to $BIND_HOST (remote-accessible). Auth token will be printed below."
+fi
+
 (sleep 1 && (xdg-open http://localhost:8800 >/dev/null 2>&1 || open http://localhost:8800 >/dev/null 2>&1)) &
 
-exec "$PYEXE" -m uvicorn backend.app:app --host 127.0.0.1 --port 8800
+exec "$PYEXE" -m uvicorn backend.app:app --host "$BIND_HOST" --port 8800

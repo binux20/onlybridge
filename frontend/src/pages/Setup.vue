@@ -36,6 +36,23 @@ const savedSubRpm = ref<number>(10)
 const targetProxy = ref<ToolId>('claude')
 const modelSaving = ref(false)
 const modelSaved = ref(false)
+const modelsError = ref<string>('')
+const modelsLoading = ref(false)
+const customModels = ref<string[]>([])
+const customInputOpen = ref(false)
+const customInputValue = ref('')
+
+function loadCustomModels() {
+  try {
+    const raw = localStorage.getItem('onlybridge_custom_models') || '[]'
+    const arr = JSON.parse(raw)
+    if (Array.isArray(arr)) customModels.value = arr.filter((x: any) => typeof x === 'string' && x.trim())
+  } catch { customModels.value = [] }
+}
+
+function saveCustomModels() {
+  try { localStorage.setItem('onlybridge_custom_models', JSON.stringify(customModels.value)) } catch {}
+}
 
 let timer: number | undefined
 
@@ -88,10 +105,52 @@ async function loadAll() {
 }
 
 async function loadModels() {
+  modelsLoading.value = true
+  modelsError.value = ''
   try {
     const r = await api.listModels()
-    models.value = r.items
-  } catch (e: any) { err.value = String(e) }
+    models.value = r.items || []
+    if (!r.items || r.items.length === 0) {
+      modelsError.value = r.last_error
+        ? t('setup.models.fail').replace('{err}', r.last_error)
+        : t('setup.models.empty')
+    } else if (r.last_error) {
+      modelsError.value = t('setup.models.stale')
+    }
+  } catch (e: any) {
+    modelsError.value = String(e)
+  } finally { modelsLoading.value = false }
+}
+
+const combinedModels = computed(() => {
+  const seen = new Set<string>()
+  const out: { id: string; custom?: boolean }[] = []
+  for (const m of models.value) {
+    if (!seen.has(m.id)) { out.push({ id: m.id }); seen.add(m.id) }
+  }
+  for (const c of customModels.value) {
+    if (c && !seen.has(c)) { out.push({ id: c, custom: true }); seen.add(c) }
+  }
+  return out
+})
+
+function addCustomModel() {
+  const v = customInputValue.value.trim()
+  if (!v) return
+  if (combinedModels.value.some(m => m.id === v)) {
+    customInputValue.value = ''
+    customInputOpen.value = false
+    return
+  }
+  customModels.value = [...customModels.value, v]
+  saveCustomModels()
+  customInputValue.value = ''
+  customInputOpen.value = false
+}
+
+function removeCustomModel(id: string) {
+  customModels.value = customModels.value.filter(x => x !== id)
+  saveCustomModels()
 }
 
 async function saveKey() {
@@ -203,6 +262,7 @@ function statusLabel(s?: ProxyInfo | null): string {
 const showSubAgent = computed(() => targetProxy.value !== 'openai_compat')
 
 onMounted(() => {
+  loadCustomModels()
   loadAll()
   loadModels()
   timer = window.setInterval(loadAll, 5000)
@@ -225,17 +285,38 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
       </div>
 
       <div class="mb-3">
-        <div class="label mb-2">{{ t('sidebar.main') }}</div>
+        <div class="label mb-2 flex items-center justify-between">
+          <span>{{ t('sidebar.main') }}</span>
+          <button class="mono text-[10px]" :disabled="modelsLoading" @click="loadModels"
+                  :style="{ color: 'var(--text-muted)', textDecoration: 'underline' }">
+            {{ modelsLoading ? t('sidebar.refreshing') : t('sidebar.refresh') }}
+          </button>
+        </div>
         <select class="input" v-model="mainModel">
-          <option v-for="m in models" :key="m.id" :value="m.id">{{ m.id }}</option>
+          <option v-for="m in combinedModels" :key="'m-'+m.id" :value="m.id">{{ m.custom ? '★ ' + m.id : m.id }}</option>
         </select>
+        <button class="mono text-[10px] mt-2" @click="customInputOpen = true"
+                :style="{ color: 'var(--accent)', textDecoration: 'underline' }">{{ t('sidebar.custom.add') }}</button>
       </div>
 
       <div v-if="showSubAgent" class="mb-3">
         <div class="label mb-2">{{ t('sidebar.sub') }}</div>
         <select class="input" v-model="subModel">
-          <option v-for="m in models" :key="m.id" :value="m.id">{{ m.id }}</option>
+          <option v-for="m in combinedModels" :key="'s-'+m.id" :value="m.id">{{ m.custom ? '★ ' + m.id : m.id }}</option>
         </select>
+      </div>
+
+      <p v-if="modelsError" class="mono text-[10px] mb-3" :style="{ color: 'var(--danger)', lineHeight: 1.5 }">
+        {{ modelsError }}
+      </p>
+
+      <div v-if="customModels.length" class="mb-3">
+        <div class="label mb-2">{{ t('sidebar.custom.list') }}</div>
+        <div v-for="c in customModels" :key="'c-'+c" class="flex items-center justify-between mono text-[11px] py-1"
+             :style="{ borderBottom: '1px solid var(--border-soft)' }">
+          <span :style="{ color: 'var(--text-dim)' }">★ {{ c }}</span>
+          <button @click="removeCustomModel(c)" :style="{ color: 'var(--text-muted)' }">×</button>
+        </div>
       </div>
 
       <p v-if="!showSubAgent" class="mono text-[11px] mt-3 mb-3" :style="{ color: 'var(--text-muted)', lineHeight: 1.5 }">
@@ -325,6 +406,25 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
       </p>
 
       <p v-if="err" class="mt-4 mono text-[12px]" :style="{ color: 'var(--danger)' }">{{ err }}</p>
+    </div>
+  </div>
+
+  <div
+    v-if="customInputOpen"
+    class="fixed inset-0 z-50 flex items-center justify-center"
+    :style="{ background: 'rgba(0,0,0,0.85)' }"
+    @click.self="customInputOpen = false"
+  >
+    <div class="card" :style="{ maxWidth: '440px', width: '90vw', padding: '24px' }">
+      <div class="label mb-2" :style="{ color: 'var(--accent)' }">{{ t('sidebar.custom.title') }}</div>
+      <p class="text-[12px] mb-3" :style="{ color: 'var(--text-dim)', lineHeight: 1.5 }">{{ t('sidebar.custom.body') }}</p>
+      <input class="input mb-3" v-model="customInputValue" :placeholder="t('sidebar.custom.placeholder')"
+             @keyup.enter="addCustomModel" autofocus />
+      <p class="text-[11px] mb-4" :style="{ color: 'var(--danger)', lineHeight: 1.5 }">{{ t('sidebar.custom.warn') }}</p>
+      <div class="flex justify-end gap-2">
+        <button class="btn btn-ghost" @click="customInputOpen = false; customInputValue = ''">{{ t('setup.preview.cancel') }}</button>
+        <button class="btn btn-primary" :disabled="!customInputValue.trim()" @click="addCustomModel">{{ t('sidebar.custom.add.btn') }}</button>
+      </div>
     </div>
   </div>
 

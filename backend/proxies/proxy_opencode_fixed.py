@@ -1233,7 +1233,34 @@ async def lifespan(app: FastAPI):
     await _session.close()
 
 
+def _read_bridge_auth_token() -> str:
+    try:
+        with open(_BRIDGE_CONFIG_PATH, "r", encoding="utf-8") as f:
+            return (json.load(f).get("bridge_auth_token") or "").strip()
+    except (OSError, json.JSONDecodeError):
+        return ""
+
+
+_LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+
+async def _proxy_auth_middleware(request, call_next):
+    cl = request.client
+    host = (cl.host if cl else "") or ""
+    if host in _LOCAL_HOSTS:
+        return await call_next(request)
+    token = _read_bridge_auth_token()
+    if not token:
+        return await call_next(request)
+    auth = request.headers.get("Authorization", "") or ""
+    presented = auth[7:].strip() if auth.startswith("Bearer ") else ""
+    if presented == token:
+        return await call_next(request)
+    return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+
 app = FastAPI(lifespan=lifespan)
+app.middleware("http")(_proxy_auth_middleware)
 
 
 async def call_onlysq(openai_body: dict, is_sub: bool, max_retries: int = 10):

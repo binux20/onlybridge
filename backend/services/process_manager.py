@@ -112,10 +112,16 @@ class ManagedProcess:
         env["PYTHONUTF8"] = "1"
         env.update(self.extra_env)
 
+        bind = "127.0.0.1"
+        try:
+            from backend import config as _cfg
+            bind = (_cfg.load_config().get("bind_host") or "127.0.0.1").strip() or "127.0.0.1"
+        except Exception:
+            pass
         cmd = [
             sys.executable, "-m", "uvicorn",
             f"{self.module}:app",
-            "--host", "127.0.0.1",
+            "--host", bind,
             "--port", str(self.port),
             "--log-level", "info",
         ]

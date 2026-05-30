@@ -1,10 +1,35 @@
 const BASE = ''
+const TOKEN_KEY = 'onlybridge_auth_token'
+
+export function getToken(): string {
+  try { return localStorage.getItem(TOKEN_KEY) || '' } catch { return '' }
+}
+
+export function setToken(t: string): void {
+  try {
+    if (t) localStorage.setItem(TOKEN_KEY, t)
+    else localStorage.removeItem(TOKEN_KEY)
+  } catch {}
+}
+
+type UnauthorizedHandler = () => void
+let onUnauthorized: UnauthorizedHandler | null = null
+export function setUnauthorizedHandler(fn: UnauthorizedHandler | null) {
+  onUnauthorized = fn
+}
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(BASE + path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...init,
-  })
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(init?.headers as Record<string, string> | undefined),
+  }
+  const tok = getToken()
+  if (tok) headers['Authorization'] = `Bearer ${tok}`
+  const r = await fetch(BASE + path, { ...init, headers })
+  if (r.status === 401) {
+    if (onUnauthorized) onUnauthorized()
+    throw new Error('401 unauthorized')
+  }
   if (!r.ok) throw new Error(`${r.status} ${r.statusText}: ${await r.text()}`)
   return r.json() as Promise<T>
 }
@@ -21,6 +46,9 @@ export interface AppConfig {
   stream_mode?: 'realtime' | 'legacy'
   tool_paths?: { claude?: string; opencode?: string }
   proxy_rpm?: Record<string, { main?: number; sub?: number }>
+  bind_host?: string
+  bridge_auth_token?: string
+  has_auth_token?: boolean
 }
 
 export interface ModelInfo {
@@ -37,8 +65,12 @@ export const api = {
   health: () => req<{ status: string; version: string }>('/api/health'),
   getConfig: () => req<AppConfig>('/api/config'),
   patchConfig: (patch: Record<string, any>) =>
-    req<AppConfig>('/api/config', { method: 'POST', body: JSON.stringify(patch) }),
-  listModels: () => req<{ items: ModelInfo[]; count: number }>('/api/models'),
+    req<AppConfig & { restart_required?: boolean }>('/api/config', { method: 'POST', body: JSON.stringify(patch) }),
+  regenerateToken: () =>
+    req<AppConfig & { restart_required?: boolean; bridge_auth_token: string }>(
+      '/api/config/regenerate-token', { method: 'POST' }
+    ),
+  listModels: () => req<{ items: ModelInfo[]; count: number; from_cache?: boolean; last_error?: string; last_status?: number; ok?: boolean }>('/api/models'),
   tokensStatus: () => req<{ has_tiktoken: boolean; install_cmd: string }>('/api/health/tokens'),
   setupStatus: (tool: string) =>
     req<{ tool: string; proxy: ProxyInfo; has_key: boolean }>(`/api/setup/${tool}/status`),

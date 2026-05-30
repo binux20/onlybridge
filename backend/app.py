@@ -32,6 +32,7 @@ from backend.routers import logs as logs_router
 from backend.routers import models as models_router
 from backend.routers import health as health_router
 from backend.services.process_manager import ManagedProcess, registry
+from backend.services.auth import dashboard_auth_middleware
 
 logging.basicConfig(
     level=logging.INFO,
@@ -47,7 +48,16 @@ async def lifespan(app: FastAPI):
     db.init_db()
     for name, module in cfg.PROXY_MODULES.items():
         registry.register(ManagedProcess(name=name, python_module=module, port=cfg.PROXY_PORTS[name]))
-    log.info("OnlyBridge dashboard ready on http://127.0.0.1:%d", cfg.PORT_DASHBOARD)
+    bind = (cfg.load_config().get("bind_host") or "127.0.0.1").strip() or "127.0.0.1"
+    if bind != "127.0.0.1":
+        token = cfg.ensure_auth_token()
+        log.info("=" * 60)
+        log.info("OnlyBridge bound to %s:%d (REMOTE-ACCESSIBLE)", bind, cfg.PORT_DASHBOARD)
+        log.info("AUTH TOKEN: %s", token)
+        log.info("Use 'Authorization: Bearer <token>' for all /api/* and proxy requests from non-localhost.")
+        log.info("Rotate via Settings -> NETWORK -> Regenerate.")
+        log.info("=" * 60)
+    log.info("OnlyBridge dashboard ready on http://%s:%d", bind, cfg.PORT_DASHBOARD)
     try:
         yield
     finally:
@@ -59,11 +69,13 @@ app = FastAPI(title="OnlyBridge", version="0.1.0", lifespan=lifespan, docs_url=N
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:*", "http://127.0.0.1:*"],
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.middleware("http")(dashboard_auth_middleware)
 
 
 @app.get("/api/health")

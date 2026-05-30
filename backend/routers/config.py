@@ -26,6 +26,8 @@ class ConfigPatch(BaseModel):
     tool_paths: dict[str, str] | None = None
     proxy_models: dict[str, dict[str, str | None]] | None = None
     proxy_rpm: dict[str, dict[str, int]] | None = None
+    bind_host: str | None = None
+    bridge_auth_token: str | None = None
 
 
 def _redact(c: dict[str, Any]) -> dict[str, Any]:
@@ -33,6 +35,9 @@ def _redact(c: dict[str, Any]) -> dict[str, Any]:
     key = out.get("onlysq_key") or ""
     out["onlysq_key"] = ("..." + key[-6:]) if key else ""
     out["has_key"] = bool(key)
+    tok = out.get("bridge_auth_token") or ""
+    out["bridge_auth_token"] = ("..." + tok[-6:]) if tok else ""
+    out["has_auth_token"] = bool(tok)
     return out
 
 
@@ -77,6 +82,21 @@ async def get_config() -> dict[str, Any]:
 @router.post("")
 async def update_config(patch: ConfigPatch) -> dict[str, Any]:
     payload = patch.model_dump(exclude_none=True)
+    needs_restart = "bind_host" in payload or "bridge_auth_token" in payload
     cfg.save_config(payload)
     await _broadcast_to_proxies(payload)
-    return _redact(cfg.load_config())
+    out = _redact(cfg.load_config())
+    if needs_restart:
+        out["restart_required"] = True
+    return out
+
+
+@router.post("/regenerate-token")
+async def regenerate_token() -> dict[str, Any]:
+    import uuid as _uuid
+    new_token = _uuid.uuid4().hex
+    cfg.save_config({"bridge_auth_token": new_token})
+    out = _redact(cfg.load_config())
+    out["restart_required"] = True
+    out["bridge_auth_token"] = new_token  # one-time reveal so dashboard can store it
+    return out

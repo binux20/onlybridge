@@ -62,6 +62,9 @@ pause
 exit /b 1
 
 :run
+for /f "usebackq delims=" %%H in (`%PYEXE% -c "import json,os; p=os.path.join('data','config.json'); d=json.load(open(p,encoding='utf-8')) if os.path.exists(p) else {}; print((d.get('bind_host') or '127.0.0.1').strip() or '127.0.0.1')" 2^>nul`) do set BIND_HOST=%%H
+if "%BIND_HOST%"=="" set BIND_HOST=127.0.0.1
+if not "%BIND_HOST%"=="127.0.0.1" echo [OnlyBridge] Binding to %BIND_HOST% (remote-accessible). Auth token will be printed below.
 start "" http://localhost:8800
-%PYEXE% -m uvicorn backend.app:app --host 127.0.0.1 --port 8800
+%PYEXE% -m uvicorn backend.app:app --host %BIND_HOST% --port 8800
 pause

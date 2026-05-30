@@ -87,8 +87,37 @@ start.bat       one-click launcher (Windows)
 start.sh        one-click launcher (macOS/Linux)
 ```
 
+## Remote / VPS access
+
+OnlyBridge can now be installed on a VPS and used from your local machine over the network. In **Settings → NETWORK** set `BIND HOST` to `0.0.0.0` (or a specific interface IP), generate an auth token, and apply. The token is required for any non-localhost request and is printed in the server logs on first start with a non-localhost bind. The same token is auto-written as `apiKey` into `opencode.json` / `~/.claude/settings.json` so your code tool authenticates against the bridge.
+
+Full step-by-step (SSH tunnel → first connect → enable remote → firewall → optional TLS via nginx/Caddy) is inside the **Docs → VPS / LAN SETUP** tab.
+
+> No built-in TLS. For internet-facing setups put nginx or Caddy in front with a real certificate, and firewall the ports to your IP. Token leak = OnlySQ key burn.
+
+## Vision / images
+
+All three proxies handle images uniformly:
+
+- If the selected model supports vision, the image in the latest user message is sent directly (multimodal `image_url`). The capability is auto-detected on the first try and cached per-model.
+- If the model does not support vision, the image is described by a fallback vision model (`gemini-2.5-pro` by default) and the description is injected as `[IMAGE DESCRIPTION]` into the text request. Only the latest user message is described — older images become `[image in conversation history]` to save traffic and Gemini calls.
+- For OpenCode the dashboard auto-writes `capabilities.vision: true` and `modalities.input: [text, image]` for the bridge models so OpenCode stops filtering images on the client side.
+
+## Per-proxy RPM
+
+Each proxy has its own MAIN / SUB rate limit. Edit in the Setup sidebar — applied live, no restart. Useful if your OnlySQ tier differs from the default 3/10.
+
+## Resilient model fetch + custom models
+
+If the OnlySQ models endpoint returns 5xx / 429 / empty, the dashboard retries up to 10 times with a 1-second backoff before falling back to the cached list and showing a status note. You can also add custom model ids manually via the **+ ADD CUSTOM MODEL** button — useful when OnlySQ ships a new model before our filter catches it. Custom models live in `localStorage` and are marked with ★ in the picker.
+
 ## Recent updates
 
+- Remote / VPS access with an auth token (Settings → NETWORK; Docs → VPS / LAN SETUP).
+- Vision / image support across all three proxies with auto multimodal-or-Gemini fallback; latest user message only.
+- Per-proxy MAIN / SUB RPM editable in the Setup sidebar, applied live.
+- Models fetch retries 10x on upstream errors, with custom model entries as a manual fallback.
+- Docs page now has a sticky table-of-contents sidebar with smooth scroll.
 - Switchable Realtime / Legacy streaming for the OpenCode and OpenAI-compatible proxies (Settings → STREAMING MODE).
 - Per-proxy main / sub model overrides — each proxy can run a different model than the global default.
 - `start.bat` falls back to `python` if the `py` launcher is not in PATH.

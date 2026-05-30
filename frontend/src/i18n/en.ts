@@ -9,6 +9,14 @@ export const en: Record<string, string> = {
   'topbar.theme.light': 'LIGHT',
   'topbar.theme.dark': 'DARK',
   'topbar.repo': 'REPO',
+  'topbar.logout': 'LOGOUT',
+
+  'login.title': 'AUTHENTICATION REQUIRED',
+  'login.body': 'This dashboard is bound to a non-localhost address. Paste the bridge auth token to continue.',
+  'login.placeholder': 'paste token here',
+  'login.submit': 'UNLOCK',
+  'login.empty': 'token cannot be empty',
+  'login.hint': 'Token is printed in the server logs at first start with bind_host != 127.0.0.1, or under Settings -> NETWORK on the host machine.',
 
   // setup page
   'setup.title': 'DASHBOARD',
@@ -56,6 +64,18 @@ export const en: Record<string, string> = {
   'sidebar.main.rpm': 'MAIN RPM',
   'sidebar.sub.rpm': 'SUB RPM',
   'sidebar.rpm.note': 'Requests per minute per proxy. Applied live, no restart needed. Match your OnlySQ tier limits to avoid 429.',
+  'sidebar.refresh': 'REFRESH',
+  'sidebar.refreshing': 'LOADING...',
+  'sidebar.custom.add': '+ ADD CUSTOM MODEL',
+  'sidebar.custom.add.btn': 'ADD',
+  'sidebar.custom.list': 'CUSTOM MODELS',
+  'sidebar.custom.title': 'ADD CUSTOM MODEL',
+  'sidebar.custom.body': 'Type the exact model id as it appears on OnlySQ. Useful if our fetch missed it or you want to test a model that is not in the list yet.',
+  'sidebar.custom.placeholder': 'e.g. claude-mythos-6-7-soslax-edition',
+  'sidebar.custom.warn': 'We do not validate that this model actually exists on OnlySQ. If it does not, requests will fail with the upstream error.',
+  'setup.models.fail': 'Fetch failed after 10 retries ({err}). OnlySQ may be down. You can add a model manually below.',
+  'setup.models.empty': 'OnlySQ returned an empty model list. Try Refresh, or add a model manually below.',
+  'setup.models.stale': 'Showing cached list — last refresh failed.',
 
   // stats
   'stats.title': 'STATS',
@@ -85,6 +105,7 @@ export const en: Record<string, string> = {
   // docs
   'docs.title': 'DOCS',
   'docs.intro': 'Three proxies expose OnlySQ to your code tools. Pick the section that matches your tool.',
+  'docs.toc': 'CONTENTS',
 
   'docs.disclaimer': 'The instructions below for getting an API key, verification and per-account RPM may be out of date — always cross-check the {link}.',
   'docs.disclaimer.bottom': 'The instructions above for getting an API key, verification and per-account RPM may be out of date — always cross-check the {link}.',
@@ -163,4 +184,39 @@ export const en: Record<string, string> = {
   'docs.vision.opencode.body': 'OpenCode filters images on the client side: if the model is not marked as vision-capable in opencode.json, the picture never leaves OpenCode and is replaced with an error like "this model does not support image input". Setup & Start now writes capabilities.vision: true and modalities.input: [text, image] for the OnlyBridge models, so OpenCode lets the image through. If you still see this error, clear ~/.cache/opencode and restart OpenCode.',
   'docs.vision.clients.title': 'OTHER OPENAI-COMPATIBLE CLIENTS',
   'docs.vision.clients.body': 'aider, Continue, Cline, Kilo Code, Zed and other OpenAI-compatible clients also decide on the client side whether to send images, based on their own model lists or capability flags. If your client refuses to send images to the proxy, mark the selected model as vision-capable in the client settings (the exact field varies). Once the image reaches the proxy, the rest of the flow (multimodal try plus Gemini fallback) works automatically.',
+
+  // network / vps
+  'settings.net.title': 'NETWORK / REMOTE ACCESS',
+  'settings.net.body': 'By default OnlyBridge listens on 127.0.0.1 (local only). To use the dashboard and proxies from another machine (LAN or VPS), set bind to 0.0.0.0 or a specific interface IP. An auth token is required for any non-localhost access.',
+  'settings.net.bind': 'BIND HOST',
+  'settings.net.bind.hint': '127.0.0.1 = local only (default). 0.0.0.0 = accept from any interface. Restart the dashboard for changes to take effect.',
+  'settings.net.token': 'AUTH TOKEN',
+  'settings.net.token.set': 'token is set',
+  'settings.net.token.unset': 'no token yet — will be auto-generated on first remote bind',
+  'settings.net.regen': 'REGENERATE TOKEN',
+  'settings.net.regen.confirm': 'This invalidates the current token. Any active client connections will be rejected. Continue?',
+  'settings.net.regen.new': 'NEW TOKEN — SHOWN ONCE',
+  'settings.net.regen.save_now': 'Copy it now. After this page reloads or you navigate away, the dashboard only shows a masked suffix.',
+  'settings.net.copy': 'COPY',
+  'settings.net.save': 'SAVE',
+  'settings.net.restart_required': 'SAVED — restart dashboard + proxies',
+  'settings.net.error.token_required': 'Bind to non-localhost without an auth token is blocked. Generate a token first.',
+  'settings.net.warn': 'Exposing OnlyBridge to the internet without a reverse proxy with TLS is risky. Use ssh tunnel / VPN / nginx-with-TLS in front for production.',
+
+  // vps docs
+  'docs.vps.title': 'VPS / LAN SETUP',
+  'docs.vps.intro': 'OnlyBridge can be installed on a VPS and used from your local machine over the network. The flow below is the safe path.',
+  'docs.vps.step1.title': '01 / INSTALL ON THE SERVER',
+  'docs.vps.step1.body': 'On the VPS: git clone https://github.com/binux20/onlybridge && cd onlybridge && bash start.sh. The first run installs dependencies and builds the frontend. Dashboard listens on 127.0.0.1:8800 by default.',
+  'docs.vps.step2.title': '02 / OPEN A LOCAL SSH TUNNEL (FIRST CONNECT)',
+  'docs.vps.step2.body': 'Before exposing anything, connect locally via SSH tunnel: ssh -L 8800:127.0.0.1:8800 user@vps. Then open http://localhost:8800 in your browser. You see the dashboard, paste your OnlySQ key.',
+  'docs.vps.step3.title': '03 / TURN ON REMOTE ACCESS',
+  'docs.vps.step3.body': 'In Settings -> NETWORK, click REGENERATE TOKEN — copy the token shown (it is revealed only once). Set BIND HOST to 0.0.0.0 and click SAVE. Close SSH tunnel. Restart start.sh on the VPS. The token now prints in the server logs on every start with non-localhost bind.',
+  'docs.vps.step4.title': '04 / CONNECT FROM YOUR LOCAL MACHINE',
+  'docs.vps.step4.body': 'Open http://VPS_IP:8800 in your browser. The dashboard shows the login overlay — paste the token. After unlock, run Setup & Start for the proxy you need. The same token is used as the apiKey in opencode.json / Claude settings, so your code tool authenticates against the bridge too.',
+  'docs.vps.firewall.title': '05 / FIREWALL (DO NOT SKIP)',
+  'docs.vps.firewall.body': 'Only open the ports you actually need: 8800 (dashboard) and the proxy ports you use (7777/7778/7779). Whitelist only your own IP if possible (ufw allow from YOUR_IP to any port 8800). Open ports without IP filtering means anyone who finds them can hammer your OnlySQ key.',
+  'docs.vps.tls.title': '06 / TLS (RECOMMENDED FOR PUBLIC IPs)',
+  'docs.vps.tls.body': 'OnlyBridge has no built-in TLS. For internet-facing setups put nginx or Caddy in front with a real certificate. Example: caddy reverse-proxy --from bridge.example.com --to 127.0.0.1:8800. Same pattern for each proxy port.',
+  'docs.vps.warn': 'OnlyBridge is alpha. Do not run it on a public IP without (a) an auth token, (b) firewall rules, (c) a TLS-terminating reverse proxy. Token leak = OnlySQ key burn.',
 }

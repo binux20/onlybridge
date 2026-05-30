@@ -10,6 +10,13 @@ const streamMode = ref<'realtime' | 'legacy'>('realtime')
 const saving = ref(false)
 const err = ref('')
 const saved = ref(false)
+const bindHost = ref('127.0.0.1')
+const hasAuthToken = ref(false)
+const authTokenMasked = ref('')
+const newTokenReveal = ref('')
+const netSaving = ref(false)
+const netSaved = ref(false)
+const netError = ref('')
 
 async function load() {
   try {
@@ -18,7 +25,48 @@ async function load() {
     claudePath.value = c.tool_paths?.claude || ''
     opencodePath.value = c.tool_paths?.opencode || ''
     streamMode.value = c.stream_mode === 'legacy' ? 'legacy' : 'realtime'
+    bindHost.value = (c.bind_host || '127.0.0.1').trim() || '127.0.0.1'
+    hasAuthToken.value = !!c.has_auth_token
+    authTokenMasked.value = c.bridge_auth_token || ''
   } catch (e: any) { err.value = String(e) }
+}
+
+async function saveNetwork() {
+  netSaving.value = true
+  netSaved.value = false
+  netError.value = ''
+  const host = bindHost.value.trim() || '127.0.0.1'
+  if (host !== '127.0.0.1' && !hasAuthToken.value) {
+    netError.value = t('settings.net.error.token_required')
+    netSaving.value = false
+    return
+  }
+  try {
+    const r = await api.patchConfig({ bind_host: host } as any)
+    netSaved.value = true
+    if ((r as any).restart_required) netSaved.value = true
+    setTimeout(() => { netSaved.value = false }, 3000)
+  } catch (e: any) { netError.value = String(e) }
+  finally { netSaving.value = false }
+}
+
+async function regenerateToken() {
+  if (!confirm(t('settings.net.regen.confirm'))) return
+  netSaving.value = true
+  netError.value = ''
+  newTokenReveal.value = ''
+  try {
+    const r = await api.regenerateToken()
+    newTokenReveal.value = r.bridge_auth_token
+    hasAuthToken.value = true
+    try { localStorage.setItem('onlybridge_auth_token', r.bridge_auth_token) } catch {}
+  } catch (e: any) { netError.value = String(e) }
+  finally { netSaving.value = false }
+}
+
+async function copyToken() {
+  if (!newTokenReveal.value) return
+  try { await navigator.clipboard.writeText(newTokenReveal.value) } catch {}
 }
 
 async function setStreamMode(m: 'realtime' | 'legacy') {
@@ -92,6 +140,38 @@ onMounted(load)
   <section class="card mb-6">
     <div class="label mb-2">{{ t('settings.subagent.title') }}</div>
     <p :style="{ color: 'var(--text-dim)' }">{{ t('settings.subagent.body') }}</p>
+  </section>
+
+  <section class="card mb-6">
+    <div class="label mb-4" :style="{ color: 'var(--accent)' }">{{ t('settings.net.title') }}</div>
+    <p class="text-[12px] mb-4" :style="{ color: 'var(--text-dim)', lineHeight: 1.5 }">{{ t('settings.net.body') }}</p>
+
+    <div class="mb-4">
+      <div class="label mb-2">{{ t('settings.net.bind') }}</div>
+      <input class="input" v-model="bindHost" placeholder="127.0.0.1" />
+      <p class="mono text-[11px] mt-2" :style="{ color: 'var(--text-muted)', lineHeight: 1.5 }">{{ t('settings.net.bind.hint') }}</p>
+    </div>
+
+    <div class="mb-4">
+      <div class="label mb-2">{{ t('settings.net.token') }}</div>
+      <div v-if="hasAuthToken" class="mono text-[12px] mb-2" :style="{ color: 'var(--text-dim)' }">{{ authTokenMasked || t('settings.net.token.set') }}</div>
+      <div v-else class="mono text-[12px] mb-2" :style="{ color: 'var(--text-muted)' }">{{ t('settings.net.token.unset') }}</div>
+      <button class="btn btn-ghost" :disabled="netSaving" @click="regenerateToken">{{ t('settings.net.regen') }}</button>
+      <div v-if="newTokenReveal" class="mt-3 p-3"
+           :style="{ background: 'var(--bg-elev-2)', border: '1px solid var(--accent)' }">
+        <div class="label mb-2" :style="{ color: 'var(--accent)' }">{{ t('settings.net.regen.new') }}</div>
+        <div class="mono text-[13px] mb-2" :style="{ color: 'var(--text)', wordBreak: 'break-all' }">{{ newTokenReveal }}</div>
+        <button class="btn btn-ghost" @click="copyToken">{{ t('settings.net.copy') }}</button>
+        <p class="text-[11px] mt-2" :style="{ color: 'var(--text-dim)' }">{{ t('settings.net.regen.save_now') }}</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <button class="btn btn-primary" :disabled="netSaving" @click="saveNetwork">{{ netSaving ? '...' : t('settings.net.save') }}</button>
+      <span v-if="netSaved" class="mono text-[12px]" :style="{ color: 'var(--accent)' }">{{ t('settings.net.restart_required') }}</span>
+    </div>
+    <p v-if="netError" class="mono text-[12px] mt-3" :style="{ color: 'var(--danger)' }">{{ netError }}</p>
+    <p class="text-[11px] mt-3" :style="{ color: 'var(--danger)', lineHeight: 1.5 }">{{ t('settings.net.warn') }}</p>
   </section>
 
   <section class="card">

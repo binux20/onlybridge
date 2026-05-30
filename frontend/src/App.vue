@@ -2,9 +2,28 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { locale, setLocale, t } from './i18n'
+import { setUnauthorizedHandler, setToken, getToken } from './api'
 
 const route = useRoute()
 const theme = ref<'dark' | 'light'>('dark')
+const loginNeeded = ref(false)
+const loginInput = ref('')
+const loginErr = ref('')
+
+function submitLogin() {
+  const v = loginInput.value.trim()
+  if (!v) { loginErr.value = t('login.empty'); return }
+  setToken(v)
+  loginInput.value = ''
+  loginErr.value = ''
+  loginNeeded.value = false
+  location.reload()
+}
+
+function logout() {
+  setToken('')
+  loginNeeded.value = true
+}
 
 function setTheme(next: 'dark' | 'light') {
   theme.value = next
@@ -17,7 +36,10 @@ onMounted(() => {
   if (saved === 'dark' || saved === 'light') setTheme(saved)
   else setTheme('dark')
   document.documentElement.setAttribute('lang', locale.value)
+  setUnauthorizedHandler(() => { loginNeeded.value = true })
 })
+
+const hasToken = computed(() => !!getToken())
 
 const tabs = computed(() => [
   { path: '/setup',    idx: '01', label: t('tab.setup') },
@@ -69,6 +91,7 @@ const routeLabel = computed(() => {
           <button class="btn btn-ghost h-8" @click="setTheme(theme === 'dark' ? 'light' : 'dark')">
             {{ theme === 'dark' ? t('topbar.theme.light') : t('topbar.theme.dark') }}
           </button>
+          <button v-if="hasToken" class="btn btn-ghost h-8" @click="logout">{{ t('topbar.logout') }}</button>
         </div>
       </div>
     </header>
@@ -81,5 +104,18 @@ const routeLabel = computed(() => {
       </div>
       <router-view />
     </main>
+
+    <div v-if="loginNeeded" class="fixed inset-0 z-50 flex items-center justify-center"
+         :style="{ background: 'rgba(0,0,0,0.85)' }">
+      <div class="card" :style="{ maxWidth: '440px', width: '90vw', padding: '24px' }">
+        <div class="label mb-2" :style="{ color: 'var(--accent)' }">{{ t('login.title') }}</div>
+        <p class="text-[13px] mb-4" :style="{ color: 'var(--text-dim)', lineHeight: 1.5 }">{{ t('login.body') }}</p>
+        <input class="input mb-3" type="password" v-model="loginInput"
+               :placeholder="t('login.placeholder')" @keyup.enter="submitLogin" autofocus />
+        <p v-if="loginErr" class="mono text-[12px] mb-3" :style="{ color: 'var(--danger)' }">{{ loginErr }}</p>
+        <button class="btn btn-primary w-full" @click="submitLogin">{{ t('login.submit') }}</button>
+        <p class="mono text-[11px] mt-3" :style="{ color: 'var(--text-muted)', lineHeight: 1.5 }">{{ t('login.hint') }}</p>
+      </div>
+    </div>
   </div>
 </template>
