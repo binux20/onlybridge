@@ -25,11 +25,44 @@ CREATE INDEX IF NOT EXISTS idx_requests_source_ts ON requests(source, ts);
 """
 
 
+class DataDirNotWritable(RuntimeError):
+    """data/ exists but the current user cannot write to it (chmod / chown issue)."""
+
+
+def _ensure_data_dir_writable() -> None:
+    d = cfg.DATA_DIR
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+    except PermissionError as e:
+        raise DataDirNotWritable(
+            f"Cannot create {d}: {e}. "
+            f"Most likely the parent directory is owned by another user (e.g. cloned via sudo). "
+            f"Fix: sudo chown -R $USER:$USER {d.parent}"
+        ) from e
+    probe = d / ".write_probe"
+    try:
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+    except OSError as e:
+        raise DataDirNotWritable(
+            f"Cannot write to {d}: {e}. "
+            f"The folder exists but the current user has no write permission. "
+            f"Fix on Linux/macOS: chmod -R u+w {d}  (or  sudo chown -R $USER:$USER {d.parent} if it belongs to root)"
+        ) from e
+
+
 def init_db() -> None:
-    cfg.DATA_DIR.mkdir(parents=True, exist_ok=True)
-    with _conn() as c:
-        c.executescript(_SCHEMA)
-        c.commit()
+    _ensure_data_dir_writable()
+    try:
+        with _conn() as c:
+            c.executescript(_SCHEMA)
+            c.commit()
+    except sqlite3.OperationalError as e:
+        raise DataDirNotWritable(
+            f"sqlite3 cannot open {cfg.DATABASE_PATH}: {e}. "
+            f"This usually means the data/ folder or the .db file is read-only or owned by another user. "
+            f"Fix: chmod -R u+w {cfg.DATA_DIR}  (or  sudo chown -R $USER:$USER {cfg.DATA_DIR.parent})"
+        ) from e
 
 
 @contextmanager

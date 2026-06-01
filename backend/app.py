@@ -45,7 +45,14 @@ log = logging.getLogger("onlybridge")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     cfg.load_config()
-    db.init_db()
+    try:
+        db.init_db()
+    except db.DataDirNotWritable as e:
+        log.error("=" * 60)
+        log.error("OnlyBridge cannot start: data directory is not writable.")
+        log.error("%s", e)
+        log.error("=" * 60)
+        raise SystemExit(1)
     for name, module in cfg.PROXY_MODULES.items():
         registry.register(ManagedProcess(name=name, python_module=module, port=cfg.PROXY_PORTS[name]))
     bind = (cfg.load_config().get("bind_host") or "127.0.0.1").strip() or "127.0.0.1"
