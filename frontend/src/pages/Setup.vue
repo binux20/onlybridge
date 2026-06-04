@@ -85,16 +85,19 @@ async function loadAll() {
   try {
     const c = await api.getConfig()
     cfg.value = c
-    const cur = modelsForProxy(c, targetProxy.value)
-    mainModel.value = cur.main
-    subModel.value = cur.sub
-    savedMain.value = cur.main
-    savedSub.value = cur.sub
-    const rpm = rpmForProxy(c, targetProxy.value)
-    mainRpm.value = rpm.main
-    subRpm.value = rpm.sub
-    savedMainRpm.value = rpm.main
-    savedSubRpm.value = rpm.sub
+    // Не затираем несохранённые правки в селектах фоновым поллером.
+    if (!hasUnsaved.value) {
+      const cur = modelsForProxy(c, targetProxy.value)
+      mainModel.value = cur.main
+      subModel.value = cur.sub
+      savedMain.value = cur.main
+      savedSub.value = cur.sub
+      const rpm = rpmForProxy(c, targetProxy.value)
+      mainRpm.value = rpm.main
+      subRpm.value = rpm.sub
+      savedMainRpm.value = rpm.main
+      savedSubRpm.value = rpm.sub
+    }
   } catch (e: any) { err.value = String(e) }
   await Promise.all((['claude', 'opencode', 'openai_compat'] as ToolId[]).map(async id => {
     try {
